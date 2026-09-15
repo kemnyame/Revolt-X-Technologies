@@ -1,0 +1,192 @@
+[
+  {
+    "slug": "business-intelligence",
+    "icon": "bi-bar-chart-line",
+    "title": "Business Intelligence & Analytics",
+    "summary": "Turn fragmented operational data into dashboards, forecasts, alerts and management decisions.",
+    "features": [
+      "Executive dashboards",
+      "Data integration",
+      "Forecasting",
+      "Anomaly detection",
+      "Automated reporting",
+      "KPI monitoring"
+    ],
+    "useCases": [
+      "Retail performance command centre",
+      "Multi-branch executive reporting",
+      "Revenue and margin intelligence"
+    ]
+  },
+  {
+    "slug": "custom-applications",
+    "icon": "bi-window-stack",
+    "title": "Custom Business Applications",
+    "summary": "Secure applications built around your workflows instead of forcing your business into generic software.",
+    "features": [
+      "Customer and staff portals",
+      "Role-based access",
+      "Workflow engines",
+      "API integrations",
+      "Mobile-responsive systems",
+      "Audit trails"
+    ],
+    "useCases": [
+      "Operations portal",
+      "Dealer/customer platform",
+      "Internal service management"
+    ]
+  },
+  {
+    "slug": "ai-business-solutions",
+    "icon": "bi-lightning-charge",
+    "title": "AI Business Solutions & Agents",
+    "summary": "Practical assistants and agents that analyse, search, summarise and automate approved business work.",
+    "features": [
+      "Business assistants",
+      "Knowledge assistants",
+      "Task agents",
+      "Generative workflows",
+      "Human approvals",
+      "AI governance"
+    ],
+    "useCases": [
+      "Internal policy assistant",
+      "Customer support copilot",
+      "Procurement analysis agent"
+    ]
+  },
+  {
+    "slug": "crm-sales",
+    "icon": "bi-people",
+    "title": "CRM & Sales Intelligence",
+    "summary": "Manage leads and customers while using data to prioritise opportunities and improve conversion.",
+    "features": [
+      "Lead capture",
+      "Sales pipelines",
+      "Customer profiles",
+      "Follow-up automation",
+      "Lead scoring",
+      "Sales forecasting"
+    ],
+    "useCases": [
+      "B2B sales CRM",
+      "Dealer lead management",
+      "Customer retention intelligence"
+    ]
+  },
+  {
+    "slug": "inventory-procurement",
+    "icon": "bi-box-seam",
+    "title": "Smart Inventory & Procurement",
+    "summary": "Control stock and purchasing while predicting demand, stock-outs and supplier issues.",
+    "features": [
+      "Multi-location stock",
+      "Purchase workflows",
+      "Supplier management",
+      "Reorder rules",
+      "Demand forecasting",
+      "Dead-stock detection"
+    ],
+    "useCases": [
+      "Pharmacy inventory",
+      "Auto-parts stock control",
+      "Distributor procurement"
+    ]
+  },
+  {
+    "slug": "fleet-logistics",
+    "icon": "bi-truck",
+    "title": "Fleet & Logistics Intelligence",
+    "summary": "Connect vehicles, drivers, trips, maintenance and operational data in one management platform.",
+    "features": [
+      "Vehicle registry",
+      "GPS integration ready",
+      "Driver management",
+      "Maintenance planning",
+      "Fuel analytics",
+      "Route and geofence insights"
+    ],
+    "useCases": [
+      "Corporate fleet control",
+      "Delivery operations",
+      "Service fleet management"
+    ]
+  },
+  {
+    "slug": "property-facility",
+    "icon": "bi-buildings",
+    "title": "Property & Facility Technology",
+    "summary": "Manage property sales, rentals, owners, guests, facilities and performance from one platform.",
+    "features": [
+      "Property inventory",
+      "Owner portals",
+      "Rental operations",
+      "Airbnb workflows",
+      "Maintenance",
+      "Revenue analytics"
+    ],
+    "useCases": [
+      "Apartment ownership portal",
+      "Property sales platform",
+      "Managed short-stay operations"
+    ]
+  },
+  {
+    "slug": "hr-workforce",
+    "icon": "bi-person-badge",
+    "title": "HR & Workforce Management",
+    "summary": "Digitise employee operations and give management clearer workforce information.",
+    "features": [
+      "Employee records",
+      "Attendance",
+      "Leave",
+      "Recruitment",
+      "Performance workflows",
+      "Workforce analytics"
+    ],
+    "useCases": [
+      "Multi-branch HR",
+      "Field workforce management",
+      "Employee self-service"
+    ]
+  },
+  {
+    "slug": "workflow-automation",
+    "icon": "bi-diagram-3",
+    "title": "Workflow & Process Automation",
+    "summary": "Replace email chains, paper forms and repetitive administration with controlled digital workflows.",
+    "features": [
+      "Digital forms",
+      "Approval routing",
+      "Notifications",
+      "SLA tracking",
+      "Audit trails",
+      "Process analytics"
+    ],
+    "useCases": [
+      "Procurement approvals",
+      "Service requests",
+      "Document approvals"
+    ]
+  },
+  {
+    "slug": "enterprise-data",
+    "icon": "bi-database-check",
+    "title": "Enterprise AI & Data Platforms",
+    "summary": "Create a secure data and knowledge foundation for analytics, search, automation and intelligent applications.",
+    "features": [
+      "Data pipelines",
+      "Data warehouses",
+      "Private knowledge search",
+      "Document intelligence",
+      "Access controls",
+      "API layer"
+    ],
+    "useCases": [
+      "Enterprise knowledge hub",
+      "Management data platform",
+      "Document intelligence portal"
+    ]
+  }
+]
