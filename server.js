@@ -32,7 +32,37 @@ async function initDb(){
 app.use(express.json({limit:'1mb'}));app.use(express.urlencoded({extended:false}));app.use(express.static(path.join(ROOT,'public')));
 async function auth(req,res,next){try{const t=cookies(req).rx_admin;if(!t)return res.status(401).json({error:'Unauthorized'});const r=await q(`SELECT a.id,a.name,a.email FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=$1 AND s.expires_at>NOW()`,[t]);if(!r.rows[0])return res.status(401).json({error:'Session expired'});req.admin=r.rows[0];next()}catch(e){next(e)}}
 function siteAnswer(question){const t=norm(question),scores=solutions.map(s=>({s,score:[s.title,s.summary,...s.features,...s.useCases].reduce((n,x)=>n+(t.split(/\W+/).some(w=>w.length>3&&norm(x).includes(w))?1:0),0)})).sort((a,b)=>b.score-a.score);if(/demo|meeting|consult/.test(t))return 'You can request a tailored demo from the Request a Demo page. Tell us your organisation, preferred solution and business problem.';if(/revolt|service|solution|build|software|business/.test(t)||scores[0].score>1){const s=scores[0].s;return `A relevant Revolt-X option is ${s.title}. ${s.summary} Typical capabilities include ${s.features.slice(0,4).join(', ')}. You can open its solution page or request a tailored demo.`}return null}
-app.post('/api/assistant',async(req,res,next)=>{try{const question=(req.body.question||'').trim();if(!question)return res.status(400).json({answer:'Please enter a question.'});let answer=siteAnswer(question),source='Revolt-X knowledge base';if(!answer){try{const u='https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch='+encodeURIComponent(question)+'&gsrlimit=1&prop=extracts&exintro=1&explaintext=1&format=json&origin=*';const r=await fetch(u,{headers:{'User-Agent':'RevoltXBusinessAssistant/3.0'}}),j=await r.json(),p=j.query?.pages?Object.values(j.query.pages):[];answer=p[0]?.extract?.slice(0,1200)||'I could not find reliable public information for that question.';source=p[0]?.extract?'Wikipedia':'No external result'}catch{answer='Live public information is temporarily unavailable.';source='System'}await q('INSERT INTO assistant_logs(question,answer,source) VALUES($1,$2,$3)',[question,answer,source]);res.json({answer,source})}catch(e){next(e)}});
+app.post('/api/assistant', async (req, res, next) => {
+  try {
+    const question = (req.body.question || '').trim();
+    if (!question) return res.status(400).json({ answer: 'Please enter a question.' });
+
+    let answer = siteAnswer(question);
+    let source = 'Revolt-X knowledge base';
+
+    if (!answer) {
+      try {
+        const u = 'https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=' +
+          encodeURIComponent(question) +
+          '&gsrlimit=1&prop=extracts&exintro=1&explaintext=1&format=json&origin=*';
+        const r = await fetch(u, { headers: { 'User-Agent': 'RevoltXBusinessAssistant/3.0' } });
+        const j = await r.json();
+        const pages = j.query?.pages ? Object.values(j.query.pages) : [];
+        answer = pages[0]?.extract?.slice(0, 1200) || 'I could not find reliable public information for that question.';
+        source = pages[0]?.extract ? 'Wikipedia' : 'No external result';
+      } catch (lookupError) {
+        console.error('Assistant public lookup failed:', lookupError);
+        answer = 'Live public information is temporarily unavailable.';
+        source = 'System';
+      }
+    }
+
+    await q('INSERT INTO assistant_logs(question,answer,source) VALUES($1,$2,$3)', [question, answer, source]);
+    res.json({ answer, source });
+  } catch (e) {
+    next(e);
+  }
+});
 app.post('/api/advisor',async(req,res,next)=>{try{const p=(req.body.problem||'').trim(),t=norm(p),rules=[['inventory-procurement',['stock','inventory','warehouse','supplier','procurement','reorder']],['fleet-logistics',['vehicle','fleet','driver','gps','delivery','route','fuel']],['crm-sales',['customer','lead','sales','crm','pipeline']],['hr-workforce',['staff','employee','payroll','leave','attendance','hr']],['property-facility',['property','rent','airbnb','tenant','facility']],['business-intelligence',['excel','data','dashboard','report','forecast','analytics']],['enterprise-data',['document','contract','policy','knowledge','manual']],['workflow-automation',['approval','manual','workflow','form','process']]];let best={slug:'custom-applications',score:0};for(const [slug,keys] of rules){const score=keys.filter(k=>t.includes(k)).length;if(score>best.score)best={slug,score}}const s=solutions.find(x=>x.slug===best.slug)||solutions[1];await q('INSERT INTO advisor_logs(problem,solution) VALUES($1,$2)',[p,s.title]);res.json({solution:s.title,reason:s.summary,capabilities:s.features.slice(0,5)})}catch(e){next(e)}});
 app.post('/api/demo',async(req,res,next)=>{try{const d=req.body||{};if(!d.name||!d.email||!d.organisation||!d.problem)return res.status(400).json({ok:false,message:'Please complete the required fields.'});await q(`INSERT INTO demo_requests(name,organisation,email,phone,country,solution,industry,size,problem) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[d.name,d.organisation,d.email,d.phone||'',d.country||'',d.solution||'',d.industry||'',d.size||'',d.problem]);res.json({ok:true,message:'Demo request received. Thank you.'})}catch(e){next(e)}});
 app.post('/api/admin/login',async(req,res,next)=>{try{const {email,password}=req.body,r=await q('SELECT * FROM admins WHERE lower(email)=lower($1)',[email||'']),row=r.rows[0];if(!row||!verify(password||'',row.password_hash))return res.status(401).json({ok:false,message:'Invalid email or password.'});const token=crypto.randomBytes(32).toString('hex'),exp=new Date(Date.now()+8*3600000);await q('INSERT INTO sessions(token,admin_id,expires_at) VALUES($1,$2,$3)',[token,row.id,exp]);res.setHeader('Set-Cookie',`rx_admin=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${process.env.NODE_ENV==='production'?'; Secure':''}`);res.json({ok:true})}catch(e){next(e)}});
