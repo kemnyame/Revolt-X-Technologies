@@ -49,3 +49,7 @@ For a larger multi-admin deployment, the next hardening step should add rate lim
 ## Business Assistant
 
 Revolt-X questions are answered from the site's solution knowledge. General public questions currently use a limited Wikipedia lookup. For a full commercial AI assistant, connect the `/api/assistant` route to your chosen AI/search provider and keep provider API keys in hosting environment variables.
+
+
+## V5 navigation and responsive update
+Products and Solutions now use responsive mega menus. Revolt-X OS and Revolt-X AI retain dedicated pages. The 10 core commercial offerings are positioned as Solutions, while packaged applications are positioned as Products. Added favicon, platform carousel, compact product showcase, and mobile refinements.
