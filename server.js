@@ -31,38 +31,21 @@ async function initDb(){
 
 app.use(express.json({limit:'1mb'}));app.use(express.urlencoded({extended:false}));app.use(express.static(path.join(ROOT,'public')));
 async function auth(req,res,next){try{const t=cookies(req).rx_admin;if(!t)return res.status(401).json({error:'Unauthorized'});const r=await q(`SELECT a.id,a.name,a.email FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=$1 AND s.expires_at>NOW()`,[t]);if(!r.rows[0])return res.status(401).json({error:'Session expired'});req.admin=r.rows[0];next()}catch(e){next(e)}}
-function siteAnswer(question){const t=norm(question),scores=solutions.map(s=>({s,score:[s.title,s.summary,...s.features,...s.useCases].reduce((n,x)=>n+(t.split(/\W+/).some(w=>w.length>3&&norm(x).includes(w))?1:0),0)})).sort((a,b)=>b.score-a.score);if(/demo|meeting|consult/.test(t))return 'You can request a tailored demo from the Request a Demo page. Tell us your organisation, preferred solution and business problem.';if(/revolt|service|solution|build|software|business/.test(t)||scores[0].score>1){const s=scores[0].s;return `A relevant Revolt-X option is ${s.title}. ${s.summary} Typical capabilities include ${s.features.slice(0,4).join(', ')}. You can open its solution page or request a tailored demo.`}return null}
-app.post('/api/assistant', async (req, res, next) => {
-  try {
-    const question = (req.body.question || '').trim();
-    if (!question) return res.status(400).json({ answer: 'Please enter a question.' });
-
-    let answer = siteAnswer(question);
-    let source = 'Revolt-X knowledge base';
-
-    if (!answer) {
-      try {
-        const u = 'https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=' +
-          encodeURIComponent(question) +
-          '&gsrlimit=1&prop=extracts&exintro=1&explaintext=1&format=json&origin=*';
-        const r = await fetch(u, { headers: { 'User-Agent': 'RevoltXBusinessAssistant/3.0' } });
-        const j = await r.json();
-        const pages = j.query?.pages ? Object.values(j.query.pages) : [];
-        answer = pages[0]?.extract?.slice(0, 1200) || 'I could not find reliable public information for that question.';
-        source = pages[0]?.extract ? 'Wikipedia' : 'No external result';
-      } catch (lookupError) {
-        console.error('Assistant public lookup failed:', lookupError);
-        answer = 'Live public information is temporarily unavailable.';
-        source = 'System';
-      }
-    }
-
-    await q('INSERT INTO assistant_logs(question,answer,source) VALUES($1,$2,$3)', [question, answer, source]);
-    res.json({ answer, source });
-  } catch (e) {
-    next(e);
-  }
-});
+const ASSISTANT_CONTEXT=`Revolt-X Technologies builds business systems, data intelligence, automation and AI solutions. Revolt-X OS is the connected foundation for identity, permissions, workflows, notifications, integrations and cross-application data. Revolt-X AI is the intelligence layer for approved use cases such as knowledge search, summarisation, document analysis, forecasting, anomaly detection, recommendations and workflow assistance. Products include Revolt AutoLink, Revolt Fleet, Revolt Property and Revolt Intelligence. Solutions include Business Intelligence & Analytics, Custom Business Applications, AI Business Solutions & Agents, CRM & Sales Intelligence, Smart Inventory & Procurement, Fleet & Logistics Intelligence, Property & Facility Technology, HR & Workforce Management, Workflow & Process Automation, and Enterprise AI & Data Platforms.`;
+function tokens(v){const stop=new Set('what which where when why how does do can could would should about tell explain need want have with from your our this that into they them then than business company solution solutions system systems software please'.split(' '));return [...new Set(norm(v).split(/[^a-z0-9]+/).filter(w=>w.length>2&&!stop.has(w)))]}
+function localAssistant(question){const t=norm(question),qt=tokens(question);
+ if(/(hello|hi|hey|good morning|good afternoon|good evening)\b/.test(t))return {answer:'Hello. I’m Ask Revolt-X. I can explain our products and solutions, or help you identify the right starting point for a business problem.',source:'Revolt-X'};
+ if(/revolt.?x os|\bos\b/.test(t))return {answer:'Revolt-X OS is the connected foundation behind our business applications. It brings identity and permissions, workflows, notifications, integrations and shared operational data into one controlled environment. It is designed to reduce disconnected tools and make it easier to expand from one application to several.',source:'Revolt-X OS'};
+ if(/revolt.?x ai|\bai\b|artificial intelligence/.test(t))return {answer:'Revolt-X AI is the intelligence layer for approved business use cases. Depending on the system, it can support knowledge search, document analysis, summarisation, forecasting, anomaly detection, recommendations and assisted workflows. AI is applied where it has a clear operational purpose and can remain subject to user permissions and human approval.',source:'Revolt-X AI'};
+ if(/demo|meeting|consult|contact|talk|speak/.test(t))return {answer:'You can use Request a Demo to describe your organisation and the problem you want to solve. Revolt-X can then scope the relevant workflow, users, integrations, data and reporting requirements before proposing a solution.',source:'Revolt-X'};
+ if(/what.*(build|offer|do)|services|solutions/.test(t))return {answer:'Revolt-X builds operational software and connected business systems. Our main solution areas cover analytics, custom applications, AI, CRM and sales, inventory and procurement, fleet and logistics, property and facilities, HR, workflow automation, and enterprise data platforms. Revolt-X OS connects these capabilities, while Revolt-X AI adds intelligence where it is useful.',source:'Revolt-X solutions'};
+ const ranked=solutions.map(x=>{const hay=tokens([x.title,x.summary,...x.features,...x.useCases].join(' '));const overlap=qt.filter(w=>hay.includes(w)).length;const phrase=[x.title,...x.features,...x.useCases].some(v=>t.includes(norm(v)))?3:0;return {x,score:overlap+phrase}}).sort((a,b)=>b.score-a.score);
+ if(ranked[0]?.score>=2){const x=ranked[0].x;return {answer:`${x.title} is a relevant starting point. ${x.summary} It can include ${x.features.slice(0,5).join(', ')}. A tailored implementation would be scoped around your users, workflow, data, integrations and reporting needs.`,source:`Revolt-X: ${x.title}`};}
+ return null;
+}
+async function aiAssistant(question){const key=process.env.OPENAI_API_KEY;if(!key)return null;const model=process.env.OPENAI_MODEL||'gpt-5.6-luna';
+ try{const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model,instructions:`You are Ask Revolt-X, the website assistant for Revolt-X Technologies. Be accurate, concise and commercially useful. Never invent Revolt-X products, clients, prices, capabilities or claims. Use this verified company context when relevant: ${ASSISTANT_CONTEXT} If a question is unrelated to Revolt-X, you may answer general factual questions, but clearly distinguish general information from Revolt-X information. If uncertain, say so.`,input:question,max_output_tokens:500})});if(!r.ok){console.error('AI assistant HTTP',r.status,await r.text());return null}const j=await r.json();const text=j.output_text||j.output?.flatMap(o=>o.content||[]).map(c=>c.text).filter(Boolean).join('\n');return text?{answer:text,source:'Revolt-X AI assistant'}:null}catch(e){console.error('AI assistant failed',e);return null}}
+app.post('/api/assistant',async(req,res,next)=>{try{const question=(req.body.question||'').trim();if(!question)return res.status(400).json({answer:'Please enter a question.'});let result=localAssistant(question);if(!result)result=await aiAssistant(question);if(!result)result={answer:'I do not have enough verified information to answer that accurately. I can help with Revolt-X products and solutions, or you can describe the business problem you want to solve. For broad general questions, connect an AI provider to Ask Revolt-X so I can answer beyond the verified Revolt-X knowledge base.',source:'Revolt-X verified knowledge'};await q('INSERT INTO assistant_logs(question,answer,source) VALUES($1,$2,$3)',[question,result.answer,result.source]);res.json(result)}catch(e){next(e)}});
 app.post('/api/advisor',async(req,res,next)=>{try{const p=(req.body.problem||'').trim(),t=norm(p),rules=[['inventory-procurement',['stock','inventory','warehouse','supplier','procurement','reorder']],['fleet-logistics',['vehicle','fleet','driver','gps','delivery','route','fuel']],['crm-sales',['customer','lead','sales','crm','pipeline']],['hr-workforce',['staff','employee','payroll','leave','attendance','hr']],['property-facility',['property','rent','airbnb','tenant','facility']],['business-intelligence',['excel','data','dashboard','report','forecast','analytics']],['enterprise-data',['document','contract','policy','knowledge','manual']],['workflow-automation',['approval','manual','workflow','form','process']]];let best={slug:'custom-applications',score:0};for(const [slug,keys] of rules){const score=keys.filter(k=>t.includes(k)).length;if(score>best.score)best={slug,score}}const s=solutions.find(x=>x.slug===best.slug)||solutions[1];await q('INSERT INTO advisor_logs(problem,solution) VALUES($1,$2)',[p,s.title]);res.json({solution:s.title,reason:s.summary,capabilities:s.features.slice(0,5)})}catch(e){next(e)}});
 app.post('/api/demo',async(req,res,next)=>{try{const d=req.body||{};if(!d.name||!d.email||!d.organisation||!d.problem)return res.status(400).json({ok:false,message:'Please complete the required fields.'});await q(`INSERT INTO demo_requests(name,organisation,email,phone,country,solution,industry,size,problem) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[d.name,d.organisation,d.email,d.phone||'',d.country||'',d.solution||'',d.industry||'',d.size||'',d.problem]);res.json({ok:true,message:'Demo request received. Thank you.'})}catch(e){next(e)}});
 app.post('/api/admin/login',async(req,res,next)=>{try{const {email,password}=req.body,r=await q('SELECT * FROM admins WHERE lower(email)=lower($1)',[email||'']),row=r.rows[0];if(!row||!verify(password||'',row.password_hash))return res.status(401).json({ok:false,message:'Invalid email or password.'});const token=crypto.randomBytes(32).toString('hex'),exp=new Date(Date.now()+8*3600000);await q('INSERT INTO sessions(token,admin_id,expires_at) VALUES($1,$2,$3)',[token,row.id,exp]);res.setHeader('Set-Cookie',`rx_admin=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${process.env.NODE_ENV==='production'?'; Secure':''}`);res.json({ok:true})}catch(e){next(e)}});
