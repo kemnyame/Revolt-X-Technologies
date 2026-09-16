@@ -188,5 +188,100 @@
       "Management data platform",
       "Document intelligence portal"
     ]
+  },
+  {
+    "slug": "digital-platforms",
+    "icon": "bi-layers",
+    "title": "Digital Platforms & Customer Experiences",
+    "summary": "Create connected portals, marketplaces and digital services that make it easier for customers, partners and teams to interact with your organisation.",
+    "features": [
+      "Customer and partner portals",
+      "Marketplaces and service platforms",
+      "Booking and transaction journeys",
+      "Account and self-service experiences",
+      "Payments and notifications",
+      "Experience analytics"
+    ],
+    "useCases": [
+      "Customer self-service portal",
+      "Multi-sided marketplace",
+      "Digital service platform"
+    ]
+  },
+  {
+    "slug": "web-mobile",
+    "icon": "bi-phone",
+    "title": "Web, Mobile & Experience Technology",
+    "summary": "Design modern digital experiences across web and mobile without limiting the solution to a single channel or device.",
+    "features": [
+      "Responsive web experiences",
+      "Web applications",
+      "Mobile applications",
+      "Progressive experiences",
+      "Accessible interface design",
+      "Connected back-office workflows"
+    ],
+    "useCases": [
+      "Customer mobile experience",
+      "Operational web application",
+      "Modern corporate digital experience"
+    ]
+  },
+  {
+    "slug": "iot-connected",
+    "icon": "bi-broadcast-pin",
+    "title": "IoT, Smart Assets & Connected Operations",
+    "summary": "Connect physical assets, devices and operational signals to software so teams can monitor, respond and make better decisions.",
+    "features": [
+      "GPS and telemetry integration",
+      "Sensor and device data",
+      "Asset monitoring",
+      "Operational alerts",
+      "Location-aware workflows",
+      "Connected dashboards"
+    ],
+    "useCases": [
+      "Smart fleet operations",
+      "Equipment monitoring",
+      "Connected facility operations"
+    ]
+  },
+  {
+    "slug": "integration-cloud",
+    "icon": "bi-cloud-arrow-up",
+    "title": "Systems Integration & Cloud Technology",
+    "summary": "Connect applications, APIs, data and cloud infrastructure so technology works as one environment instead of isolated tools.",
+    "features": [
+      "API integration",
+      "Cloud deployment",
+      "Identity and authentication",
+      "Payments and communications",
+      "Data exchange",
+      "Integration monitoring"
+    ],
+    "useCases": [
+      "Connect existing business systems",
+      "Cloud-ready application deployment",
+      "Payment and messaging integration"
+    ]
+  },
+  {
+    "slug": "technology-modernisation",
+    "icon": "bi-arrow-repeat",
+    "title": "Technology Modernisation & Digital Transformation",
+    "summary": "Modernise outdated, manual or fragmented operations and create a practical path from legacy technology to connected digital work.",
+    "features": [
+      "Legacy system assessment",
+      "Spreadsheet replacement",
+      "Process redesign",
+      "Application modernisation",
+      "Data migration",
+      "Phased transformation roadmaps"
+    ],
+    "useCases": [
+      "Replace spreadsheet-led operations",
+      "Modernise an internal legacy system",
+      "Digitise a manual service process"
+    ]
   }
 ]
