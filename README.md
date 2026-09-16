@@ -53,3 +53,6 @@ Revolt-X questions are answered from the site's solution knowledge. General publ
 
 ## V5 navigation and responsive update
 Products and Solutions now use responsive mega menus. Revolt-X OS and Revolt-X AI retain dedicated pages. The 10 core commercial offerings are positioned as Solutions, while packaged applications are positioned as Products. Added favicon, platform carousel, compact product showcase, and mobile refinements.
+
+## V9 update
+Retains the established Revolt-X visual design while fixing mobile navigation, simplifying mega menus, expanding Adriana, improving product showcase imagery, and refining the footer.
