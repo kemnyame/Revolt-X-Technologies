@@ -1,0 +1,19 @@
+{
+  "name": "revolt-staff-birthdays",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Revolt staff birthdays, notifications, Excel import and export",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "pg": "^8.16.3",
+    "exceljs": "^4.4.0",
+    "multer": "^2.0.2"
+  }
+}
