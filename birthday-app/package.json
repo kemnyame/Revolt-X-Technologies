@@ -2,7 +2,7 @@
   "name": "revolt-staff-birthdays",
   "version": "1.0.0",
   "private": true,
-  "description": "Revolt staff birthdays, notifications, Excel import and export",
+  "description": "Revolt birthday management import and export XLS XLSX CSV PDF",
   "engines": {
     "node": "22.x"
   },
@@ -14,6 +14,10 @@
     "express": "^5.1.0",
     "pg": "^8.16.3",
     "exceljs": "^4.4.0",
-    "multer": "^2.0.2"
+    "multer": "^2.0.2",
+    "@stackline/xlsx": "^1.0.9",
+    "csv-parse": "^5.6.0",
+    "pdf-parse": "^2.4.5",
+    "pdfkit": "^0.17.2"
   }
 }
