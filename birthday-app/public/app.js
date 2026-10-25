@@ -62,7 +62,7 @@ async function download(url,fallback){
     const name=res.headers.get('content-disposition')?.match(/filename="([^"]+)"/)?.[1]||fallback;
     const blob=await res.blob(),href=URL.createObjectURL(blob),a=document.createElement('a');
     a.href=href;a.download=name;document.body.appendChild(a);a.click();a.remove();
-    setTimeout(()=>URL.revokeObjectURL(href),30000);toast('Excel file downloaded.');
+    setTimeout(()=>URL.revokeObjectURL(href),30000);toast('File downloaded: '+name);
   }catch(e){toast(e.message);}
 }
 const visible = () => state.data.staff.filter(s=>s.employment_status==='active'&&!s.hide_from_celebrations);
@@ -465,8 +465,14 @@ $('emailGreeting').addEventListener('click',sendGreetingEmail);
 $('copyGreeting').addEventListener('click',async()=>{
   try{await navigator.clipboard.writeText($('greetingText').value);toast('Birthday message copied.');}catch{toast('Select the message and copy it from the text box.');}
 });
-$('exportPending').addEventListener('click',()=>download('/api/export?scope=pending','pending_birthdays.xlsx'));
-$('exportAllButton').addEventListener('click',()=>download('/api/export?scope=all','all_staff_birthdays.xlsx'));
+$('exportPending').addEventListener('click',()=>{
+  const format=$('exportFormat').value;
+  download('/api/export?scope=pending&format='+encodeURIComponent(format),'pending_birthdays.'+format);
+});
+$('exportAllButton').addEventListener('click',()=>{
+  const format=$('staffExportFormat').value;
+  download('/api/export?scope=all&format='+encodeURIComponent(format),'all_staff_birthdays.'+format);
+});
 $('templateButton').addEventListener('click',()=>download('/api/template','revolt_birthday_template.xlsx'));
 $('importButton').addEventListener('click',()=>{$('importResult').textContent='';$('importDialog').showModal();});
 $('importForm').addEventListener('submit',importExcel);
