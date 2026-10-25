@@ -110,7 +110,7 @@
         </section>
         <section id="page-staff" class="page hidden">
           <div class="page-head"><div><p class="breadcrumb">Home <span>›</span> People</p><h1>Staff Directory</h1><p class="subtitle">Add and edit staff using seven simple fields. Import and export XLS, XLSX, CSV or PDF files.</p></div>
-          <div class="page-actions"><button id="templateButton" class="btn btn-outline">↓ Excel template</button><button id="importButton" class="btn btn-outline">↑ Import Excel</button><button id="exportAllButton" class="btn btn-outline">↓ Export all</button><button id="addStaffButton" class="btn btn-primary">+ Add staff</button></div></div>
+          <div class="page-actions"><button id="templateButton" class="btn btn-outline">↓ Excel template</button><button id="importButton" class="btn btn-outline">↑ Import file</button><select id="staffExportFormat" class="export-format" aria-label="Choose staff export format"><option value="xlsx">Excel (.xlsx)</option><option value="xls">Excel 97–2003 (.xls)</option><option value="csv">CSV (.csv)</option><option value="pdf">PDF (.pdf)</option></select><button id="exportAllButton" class="btn btn-outline">↓ Export all</button><button id="addStaffButton" class="btn btn-primary">+ Add staff</button></div></div>
           <div class="filter-strip"><label>Department <select id="departmentFilter"><option value="">All departments</option></select></label><label>Status <select id="statusFilter"><option value="">All staff</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label><span id="directoryCount"></span></div>
           <section id="staffTable" class="table-card"></section>
         </section>
