@@ -8,7 +8,8 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --check server.js && node --check file-formats.js && node --check birthdays.js && node --check birthday-fields.js && node --check public/app.js && node --test test/*.test.js",
+    "postinstall": "npm test"
   },
   "dependencies": {
     "express": "^5.1.0",
