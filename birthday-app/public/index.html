@@ -74,7 +74,7 @@
         <section id="page-birthdays" class="page">
           <div class="page-head">
             <div><p class="breadcrumb">Home <span>›</span> Notifications</p><h1>Birthday Management</h1><p class="subtitle">Celebrate your colleagues and make their special day even brighter.</p></div>
-            <div class="page-actions"><button id="addFromHome" class="btn btn-outline">+ Add staff</button><button id="exportPending" class="btn btn-primary">↓ Export pending birthdays</button></div>
+            <div class="page-actions"><button id="addFromHome" class="btn btn-outline">+ Add staff</button><select id="exportFormat" class="export-format" aria-label="Choose export file format"><option value="xlsx">Excel (.xlsx)</option><option value="xls">Excel 97–2003 (.xls)</option><option value="csv">CSV (.csv)</option><option value="pdf">PDF (.pdf)</option></select><button id="exportPending" class="btn btn-primary">↓ Export pending birthdays</button></div>
           </div>
           <div class="dashboard-grid">
             <div class="dashboard-main">
@@ -109,7 +109,7 @@
           </div>
         </section>
         <section id="page-staff" class="page hidden">
-          <div class="page-head"><div><p class="breadcrumb">Home <span>›</span> People</p><h1>Staff Directory</h1><p class="subtitle">Add and edit staff using seven simple details. Import or export the same fields in Excel.</p></div>
+          <div class="page-head"><div><p class="breadcrumb">Home <span>›</span> People</p><h1>Staff Directory</h1><p class="subtitle">Add and edit staff using seven simple fields. Import and export XLS, XLSX, CSV or PDF files.</p></div>
           <div class="page-actions"><button id="templateButton" class="btn btn-outline">↓ Excel template</button><button id="importButton" class="btn btn-outline">↑ Import Excel</button><button id="exportAllButton" class="btn btn-outline">↓ Export all</button><button id="addStaffButton" class="btn btn-primary">+ Add staff</button></div></div>
           <div class="filter-strip"><label>Department <select id="departmentFilter"><option value="">All departments</option></select></label><label>Status <select id="statusFilter"><option value="">All staff</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label><span id="directoryCount"></span></div>
           <section id="staffTable" class="table-card"></section>
@@ -174,10 +174,10 @@
     </form>
   </dialog>
   <dialog id="importDialog" class="modal">
-    <div class="modal-header"><div><p class="eyebrow">EXCEL IMPORT</p><h2>Import staff birthdays</h2></div><button class="dialog-close" type="button" data-close="importDialog">×</button></div>
+    <div class="modal-header"><div><p class="eyebrow">STAFF IMPORT</p><h2>Import staff birthdays</h2></div><button class="dialog-close" type="button" data-close="importDialog">×</button></div>
     <div class="modal-body">
-      <p class="muted">The Excel file needs just seven columns: <strong>Staff ID, Name, Number, Birthday, Department, Job Title, Email.</strong> Use DD/MM/YYYY for birthdays. Import up to 2,000 records; matching Staff IDs are updated, and any invalid rows are reported.</p>
-      <form id="importForm"><label class="upload-zone">📁 <strong>Choose .xlsx file</strong><span>Maximum file size: 3 MB</span><input required name="file" accept=".xlsx" type="file"/></label><button class="btn btn-primary btn-wide" type="submit">Import birthdays</button></form>
+      <p class="muted">Upload <strong>.xls, .xlsx, .csv or .pdf</strong> containing these seven columns: <strong>Staff ID, Name, Number, Birthday, Department, Job Title, Email.</strong> Birthday format: DD/MM/YYYY. Maximum 2,000 records per import. Re-importing a Staff ID updates its record.</p><p class="form-note pdf-note">PDF imports must contain selectable text in a table, such as a PDF exported from this application. Scanned or image-only PDFs cannot be imported.</p>
+      <form id="importForm"><label class="upload-zone">📁 <strong>Choose XLS, XLSX, CSV or PDF</strong><span>Maximum file size: 5 MB</span><input required name="file" accept=".xls,.xlsx,.csv,.pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/pdf" type="file"/></label><button class="btn btn-primary btn-wide" type="submit">Import birthdays</button></form>
       <div id="importResult"></div>
     </div>
   </dialog>
