@@ -5,6 +5,12 @@ CREATE TABLE IF NOT EXISTS birthday_admins (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+-- Existing installations are upgraded safely at startup; existing administrators stay active.
+ALTER TABLE birthday_admins ADD COLUMN IF NOT EXISTS full_name text NOT NULL DEFAULT '';
+ALTER TABLE birthday_admins ADD COLUMN IF NOT EXISTS must_change_password boolean NOT NULL DEFAULT false;
+ALTER TABLE birthday_admins ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true;
+ALTER TABLE birthday_admins ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES birthday_admins(id) ON DELETE SET NULL;
+ALTER TABLE birthday_admins ADD COLUMN IF NOT EXISTS last_login_at timestamptz;
 CREATE TABLE IF NOT EXISTS birthday_sessions (
   token_hash text PRIMARY KEY,
   admin_id uuid NOT NULL REFERENCES birthday_admins(id) ON DELETE CASCADE,
