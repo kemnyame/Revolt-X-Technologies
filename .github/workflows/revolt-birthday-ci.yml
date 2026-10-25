@@ -1,0 +1,28 @@
+name: Revolt Birthday App CI
+on:
+  push:
+    branches: [revolt-staff-birthdays]
+    paths:
+      - 'birthday-app/**'
+      - '.github/workflows/revolt-birthday-ci.yml'
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: birthday-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Check syntax
+        run: |
+          node --check server.js
+          node --check birthdays.js
+          node --check public/app.js
+      - name: Run birthday tests
+        run: npm test
