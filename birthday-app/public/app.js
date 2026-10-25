@@ -9,7 +9,11 @@ const months=['January','February','March','April','May','June','July','August',
 function escapeHtml(value){const d=document.createElement('div');d.textContent=String(value??'');return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function shortDate(value){return new Intl.DateTimeFormat('en-GB',{timeZone:'UTC',day:'2-digit',month:'short',year:'numeric'}).format(new Date(String(value)+'T00:00:00Z'));}
 function dayLabel(d){return d===0?'Today':d===1?'Tomorrow':'In '+d+' days';}
-function nameOf(s){return s.first_name+' '+s.last_name;}
+function nameOf(s){return [s.first_name,s.last_name].filter(Boolean).join(' ');}
+function formatStaffBirthday(s){
+  return String(s.birth_day).padStart(2,'0')+'/'+String(s.birth_month).padStart(2,'0')+
+    (s.birth_year!==null&&s.birth_year!==undefined?'/'+s.birth_year:'');
+}
 function initials(s){return ((s.first_name||'?')[0]+(s.last_name||'?')[0]).toUpperCase();}
 function avatar(s){
   const color=(s.staff_code||'').split('').reduce((a,x)=>a+x.charCodeAt(0),0)%5;
@@ -171,16 +175,23 @@ function renderDirectory(){
   if(departments.includes(existing))$('departmentFilter').value=existing;
   const dep=$('departmentFilter').value,status=$('statusFilter').value,search=state.query.toLowerCase();
   const list=staff.filter(s=>(!dep||s.department===dep)&&(!status||s.employment_status===status)&&
-    (nameOf(s)+' '+s.staff_code+' '+s.department+' '+s.job_title+' '+s.email).toLowerCase().includes(search));
+    (nameOf(s)+' '+s.staff_code+' '+s.phone_number+' '+s.department+' '+s.job_title+' '+s.email).toLowerCase().includes(search));
   $('directoryCount').textContent=list.length+' staff';
   if(!list.length){
     $('staffTable').innerHTML='<div class="empty-state"><span class="empty-illustration">👥</span><h3>No staff found</h3><p>Add staff manually or import them from Excel.</p></div>';
     return;
   }
-  $('staffTable').innerHTML='<table class="directory-table"><thead><tr><th>Staff</th><th>Staff ID</th><th>Department</th><th>Birthday</th><th>Status</th><th>Privacy</th><th>Action</th></tr></thead><tbody>'+
-    list.map(s=>'<tr><td>'+personInfo(s)+'</td><td>'+escapeHtml(s.staff_code)+'</td><td>'+escapeHtml(s.department||'—')+
-    '</td><td>'+String(s.birth_day).padStart(2,'0')+' '+months[s.birth_month-1]+'</td><td><span class="status-chip '+(s.employment_status==='inactive'?'inactive':'')+'">'+escapeHtml(s.employment_status)+'</span></td><td>'+
-    (s.hide_from_celebrations?'<span class="privacy-chip">Excluded</span>':'Included')+'</td><td><button class="small-action" data-edit="'+escapeHtml(s.id)+'">Edit</button></td></tr>').join('')+
+  $('staffTable').innerHTML='<table class="directory-table"><thead><tr>'+
+    '<th>Staff ID</th><th>Name</th><th>Number</th><th>Birthday</th><th>Department</th><th>Job Title</th><th>Email</th><th>Action</th>'+
+    '</tr></thead><tbody>'+
+    list.map(s=>'<tr><td><strong>'+escapeHtml(s.staff_code)+'</strong></td>'+
+      '<td>'+personInfo(s)+'</td>'+
+      '<td>'+escapeHtml(s.phone_number||'—')+'</td>'+
+      '<td>'+escapeHtml(formatStaffBirthday(s))+'</td>'+
+      '<td>'+escapeHtml(s.department||'—')+'</td>'+
+      '<td>'+escapeHtml(s.job_title||'—')+'</td>'+
+      '<td>'+escapeHtml(s.email||'—')+'</td>'+
+      '<td><button class="small-action" data-edit="'+escapeHtml(s.id)+'">Edit</button></td></tr>').join('')+
     '</tbody></table>';
 }
 async function renderHistory(){
@@ -216,32 +227,48 @@ function navigate(page){
 }
 function openStaff(id=null){
   state.editId=id;
-  const form=$('staffForm');form.reset();$('staffError').textContent='';
+  const form=$('staffForm');
+  form.reset();$('staffError').textContent='';
   $('staffModalTitle').textContent=id?'Edit staff member':'Add staff member';
   if(id){
     const s=state.data.staff.find(x=>x.id===id);
     if(!s)return toast('Staff record not found.');
-    for(const name of ['staff_code','first_name','last_name','birth_day','birth_month','birth_year','department','job_title','email','employment_status']){
-      const input=form.elements.namedItem(name);
-      if(input)input.value=s[name]??'';
+    const fields={
+      staff_code:s.staff_code,
+      name:nameOf(s),
+      number:s.phone_number||'',
+      birthday:formatStaffBirthday(s),
+      department:s.department||'',
+      job_title:s.job_title||'',
+      email:s.email||''
+    };
+    for(const [key,value] of Object.entries(fields)){
+      const input=form.elements.namedItem(key);
+      if(input)input.value=value;
     }
-    form.elements.namedItem('hide_from_celebrations').checked=!!s.hide_from_celebrations;
   }
   $('staffDialog').showModal();
 }
 async function saveStaff(e){
   e.preventDefault();
-  const form=$('staffForm'),raw=new FormData(form),data=Object.fromEntries(raw.entries());
-  data.hide_from_celebrations=form.elements.namedItem('hide_from_celebrations').checked;
+  const form=$('staffForm'),data=Object.fromEntries(new FormData(form).entries());
   if(state.editId){
     const existing=state.data.staff.find(s=>s.id===state.editId);
+    // Preserve existing admin-only account/status/privacy fields while simplifying the form.
     data.avatar_url=existing?.avatar_url||'';
+    data.employment_status=existing?.employment_status||'active';
+    data.hide_from_celebrations=!!existing?.hide_from_celebrations;
   }
   const button=form.querySelector('button[type=submit]');button.disabled=true;
   try{
-    await api('/api/staff'+(state.editId?'/'+state.editId:''),{method:state.editId?'PUT':'POST',body:data});
-    $('staffDialog').close();await refresh(true);toast(state.editId?'Staff member updated.':'Staff member added.');
-  }catch(e){$('staffError').textContent=e.message;}finally{button.disabled=false;}
+    await api('/api/staff'+(state.editId?'/'+state.editId:''),{
+      method:state.editId?'PUT':'POST',body:data
+    });
+    $('staffDialog').close();
+    await refresh(true);
+    toast(state.editId?'Staff member updated.':'Staff member added.');
+  }catch(err){$('staffError').textContent=err.message;}
+  finally{button.disabled=false;}
 }
 function openGreeting(id){
   const s=state.data.staff.find(x=>x.id===id);
