@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "Revolt - Technologies Birthday Management",
+  "short_name": "Revolt Birthdays",
+  "description": "Staff birthday calendar and management",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#1c1a28",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
