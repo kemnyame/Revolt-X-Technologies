@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { isValidBirthday, staffWithBirthday, birthdayCountdownLabel } = require('./birthdays');
 const { parseBirthday, displayBirthday, splitName } = require('./birthday-fields');
+const { importRecords, exportContent, PENDING_HEADERS, STAFF_HEADERS, FORMATS } = require('./file-formats');
 
 const PORT = Number(process.env.PORT || 10000);
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -320,7 +321,9 @@ app.get('/api/template',async(req,res,next)=>{
 app.get('/api/export',async(req,res,next)=>{
   try{
     const scope=text(req.query.scope||'pending',30);
+    const format=text(req.query.format||'xlsx',10).toLowerCase();
     if(!['pending','upcoming','this_month','all'].includes(scope))return fail(res,400,'Invalid export selection.');
+    if(!FORMATS.includes(format))return fail(res,400,'Export format must be xls, xlsx, csv or pdf.');
     const r=await db.query('SELECT * FROM birthday_staff ORDER BY first_name,last_name LIMIT 10000');
     const greetingRows=(await db.query("SELECT staff_id,birthday_on::text AS birthday_on FROM birthday_greetings WHERE birthday_on>=current_date AND birthday_on<current_date+interval '2 years'")).rows;
     const greeted=new Set(greetingRows.map(x=>x.staff_id+':'+x.birthday_on));
@@ -331,6 +334,20 @@ app.get('/api/export',async(req,res,next)=>{
       (scope==='this_month' ? x.birth_month===new Date().getUTCMonth()+1 :
        scope==='upcoming' ? x.days_until<=30 :
        x.days_until<=days&&!x.greeted)));
+    if(format!=='xlsx'){
+      const headers=scope==='pending'?PENDING_HEADERS:STAFF_HEADERS;
+      const records=filtered.map(s=>{
+        const row=[s.staff_code,[s.first_name,s.last_name].filter(Boolean).join(' '),s.phone_number||'',
+          displayBirthday(s),s.department,s.job_title,s.email];
+        if(scope==='pending')row.push(s.next_birthday,birthdayCountdownLabel(s.days_until));
+        return row;
+      });
+      const file=await exportContent(format,headers,records,scope);
+      res.set('Content-Type',file.mime);
+      res.set('Content-Disposition','attachment; filename="revolt_birthdays_'+scope+'_'+new Date().toISOString().slice(0,10)+'.'+format+'"');
+      res.set('Content-Length',String(file.buffer.length));
+      return res.send(file.buffer);
+    }
     const {wb,ws}=newWorkbook();
     if(scope==='pending'){
       // Preserve the seven standard staff columns, adding actionable information
@@ -358,48 +375,22 @@ app.get('/api/export',async(req,res,next)=>{
     await sendBook(res,wb,'revolt_birthdays_'+scope+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
   }catch(e){next(e);}
 });
-const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:3*1024*1024,files:1},
-  fileFilter:(req,file,cb)=>cb(null,/\.xlsx$/i.test(file.originalname))});
-function cellString(cell){
-  const v=cell?.value;
-  if(v===null||v===undefined)return '';
-  if(v instanceof Date)return v.toISOString().slice(0,10);
-  if(typeof v==='object')return String(v.result??v.text??v.richText?.map(p=>p.text).join('')??'');
-  return String(v).trim();
-}
+const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:5*1024*1024,files:1},
+  fileFilter:(req,file,cb)=>cb(null,/\.(xls|xlsx|csv|pdf)$/i.test(file.originalname))});
 app.post('/api/import',upload.single('file'),async(req,res,next)=>{
   try{
-    if(!req.file)return fail(res,400,'Choose an Excel .xlsx file of no more than 3 MB.');
-    const wb=new ExcelJS.Workbook();
-    try{await wb.xlsx.load(req.file.buffer);}catch{return fail(res,400,'Could not read this Excel file. Download and use the template.');}
-    const ws=wb.worksheets[0];
-    if(!ws||ws.rowCount<2)return fail(res,400,'The spreadsheet contains no staff records.');
-    if(ws.rowCount>2001)return fail(res,400,'You can import up to 2,000 staff records at once.');
-    const normalize=v=>String(v).toLowerCase().replace(/[^a-z0-9]/g,'');
-    const headers={};
-    ws.getRow(1).eachCell((cell,col)=>{headers[normalize(cellString(cell))]=col;});
-    if(!headers.number&&headers.phonenumber)headers.number=headers.phonenumber;
-    if(!headers.number&&headers.contactnumber)headers.number=headers.contactnumber;
-    for(const key of ['staffid','name','birthday']){
-      if(!headers[key])return fail(res,400,'Missing column: '+key+'. Use the seven-column Excel template.');
-    }
-    const get=(row,key)=>headers[key]?cellString(row.getCell(headers[key])):'';
+    if(!req.file)return fail(res,400,'Choose an XLS, XLSX, CSV or text-based PDF file, maximum 5 MB.');
+    let records;
+    try{records=await importRecords(req.file.buffer,req.file.originalname);}
+    catch(error){return fail(res,400,error.message);}
     const client=await db.connect();
     let inserted=0,updated=0,skipped=0;const errors=[];
     try{
       await client.query('BEGIN');
-      for(let i=2;i<=ws.rowCount;i++){
-        const row=ws.getRow(i);
-        if(!row.hasValues)continue;
+      for(const row of records){
         try{
-          const rawBirthday=headers.birthday?row.getCell(headers.birthday).value:null;
-          const birthday=rawBirthday&&typeof rawBirthday==='object'&&!(rawBirthday instanceof Date)
-            ? (rawBirthday.result??rawBirthday.text??get(row,'birthday')):rawBirthday;
-          const s=validateStaff({
-            staff_code:get(row,'staffid'),name:get(row,'name'),number:get(row,'number'),
-            birthday,department:get(row,'department'),job_title:get(row,'jobtitle'),email:get(row,'email')
-          });
-          // Existing staff keep inactive/privacy settings and photos when re-imported.
+          const s=validateStaff(row);
+          // Reimports preserve privacy preferences, active status, and photos.
           const args=[s.staff_code,s.first_name,s.last_name,s.phone_number,s.birth_day,s.birth_month,
             s.birth_year,s.department,s.job_title,s.email];
           const q='INSERT INTO birthday_staff(staff_code,first_name,last_name,phone_number,birth_day,birth_month,birth_year,department,job_title,email) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) '+
@@ -411,19 +402,20 @@ app.post('/api/import',upload.single('file'),async(req,res,next)=>{
             const outcome=await client.query(q,args);
             if(outcome.rows[0].inserted)inserted++;else updated++;
             await client.query('RELEASE SAVEPOINT staff_import_row');
-          }catch(queryError){
+          }catch(error){
             await client.query('ROLLBACK TO SAVEPOINT staff_import_row');
             await client.query('RELEASE SAVEPOINT staff_import_row');
-            throw queryError;
+            throw error;
           }
-        }catch(e){
-          skipped++;if(errors.length<100)errors.push({row:i,reason:e.message||'Invalid row'});
+        }catch(error){
+          skipped++;
+          if(errors.length<100)errors.push({row:row.row,reason:error.message||'Invalid row'});
         }
       }
       await client.query('INSERT INTO birthday_import_runs(filename,inserted,updated,skipped,errors,performed_by) VALUES($1,$2,$3,$4,$5,$6)',
         [path.basename(req.file.originalname).slice(0,200),inserted,updated,skipped,JSON.stringify(errors),req.admin.id]);
       await client.query('COMMIT');
-    }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+    }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
     res.json({inserted,updated,skipped,errors,more_errors:skipped>errors.length});
   }catch(e){next(e);}
 });
