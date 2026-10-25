@@ -209,8 +209,8 @@ async function renderHistory(){
       $('greetingHistory').innerHTML='<div class="empty-state"><span class="empty-illustration">💌</span><h3>No greetings recorded yet</h3><p>As you celebrate colleagues, you can mark their birthdays as acknowledged.</p></div>';return;
     }
     $('greetingHistory').innerHTML='<table class="directory-table"><thead><tr><th>Colleague</th><th>Staff ID</th><th>Birthday</th><th>Recorded on</th><th>Note</th></tr></thead><tbody>'+
-      r.history.map(x=>'<tr><td><strong>'+escapeHtml(x.first_name+' '+x.last_name)+'</strong></td><td>'+escapeHtml(x.staff_code)+'</td><td>'+shortDate(x.birthday_on)+'</td><td>'+
-        new Date(x.created_at).toLocaleDateString('en-GB')+'</td><td>'+escapeHtml(x.note||'Marked as celebrated')+'</td></tr>').join('')+'</tbody></table>';
+      r.history.map(x=>'<tr><td data-label="Colleague"><strong>'+escapeHtml(x.first_name+' '+x.last_name)+'</strong></td><td data-label="Staff ID">'+escapeHtml(x.staff_code)+'</td><td data-label="Birthday">'+shortDate(x.birthday_on)+'</td><td data-label="Recorded on">'+
+        new Date(x.created_at).toLocaleDateString('en-GB')+'</td><td data-label="Note">'+escapeHtml(x.note||'Marked as celebrated')+'</td></tr>').join('')+'</tbody></table>';
   }catch(e){toast(e.message);}
 }
 async function renderImports(){
@@ -336,9 +336,9 @@ async function renderAdmins(){
           '<button type="button" class="small-action" data-reset-admin="'+escapeHtml(a.id)+'" '+(!a.is_active?'disabled':'')+'>Reset password</button> '+
           '<button type="button" class="small-action" data-toggle-admin="'+escapeHtml(a.id)+'" data-active="'+(a.is_active?'false':'true')+'">'+
           (a.is_active?'Suspend':'Reactivate')+'</button>';
-        return '<tr><td><strong>'+escapeHtml(a.full_name||'Administrator')+
-          '</strong><br/><span class="muted">'+escapeHtml(a.email)+'</span></td><td>'+status+'</td><td>'+first+
-          '</td><td>'+escapeHtml(last)+'</td><td>'+actions+'</td></tr>';
+        return '<tr><td data-label="Administrator"><strong>'+escapeHtml(a.full_name||'Administrator')+
+          '</strong><br/><span class="muted">'+escapeHtml(a.email)+'</span></td><td data-label="Account status">'+status+'</td><td data-label="Password setup">'+first+
+          '</td><td data-label="Last login">'+escapeHtml(last)+'</td><td data-label="Actions">'+actions+'</td></tr>';
       }).join('')+'</tbody></table>';
   }catch(e){toast(e.message);}
 }
