@@ -301,3 +301,10 @@ h2{letter-spacing:-.5px}
 @media (prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important;animation:none!important}}
 
 .person-description{min-width:0}
+
+/* Dedicated application brand name */
+.sidebar-logo{height:auto;min-height:85px;padding-bottom:17px}
+.brand-subtext{display:block;font-size:10px;letter-spacing:.04em;line-height:1.4;font-weight:500;color:#aab2bd;padding-top:6px}
+.brand-caption{font-size:12px;letter-spacing:.055em;font-weight:700;color:#65748b}
+.dark-caption{margin-top:-69px;margin-bottom:66px}
+@media(max-width:620px){.dark-caption{margin-top:-54px;margin-bottom:54px}}
