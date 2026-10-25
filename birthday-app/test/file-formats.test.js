@@ -20,6 +20,18 @@ test('CSV exports and imports preserve Ghanaian phone numbers and complex names'
   assert.equal(records[1].birthday,'25/10');
   assert.equal(records[1].job_title,'Senior "Officer"');
 });
+test('XLSX import accepts the standard seven-column template',async()=>{
+  const ExcelJS=require('exceljs');
+  const workbook=new ExcelJS.Workbook(),sheet=workbook.addWorksheet('Staff Birthdays');
+  sheet.addRow(STAFF_HEADERS);
+  sheet.addRow(row);
+  const file=Buffer.from(await workbook.xlsx.writeBuffer());
+  const parsed=await importRecords(file,'birthdays.xlsx');
+  assert.equal(parsed.length,1);
+  assert.equal(parsed[0].staff_code,'STF-021');
+  assert.equal(parsed[0].number,'0241234567');
+});
+
 test('XLS export is a real Excel 97-2003 file that imports again',async()=>{
   const out=await exportContent('xls',STAFF_HEADERS,[row],'all');
   assert.equal(out.mime,'application/vnd.ms-excel');
