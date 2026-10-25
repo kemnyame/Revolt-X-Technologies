@@ -6,7 +6,7 @@ const multer = require('multer');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
-const { isValidBirthday, staffWithBirthday } = require('./birthdays');
+const { isValidBirthday, staffWithBirthday, birthdayCountdownLabel } = require('./birthdays');
 const { parseBirthday, displayBirthday, splitName } = require('./birthday-fields');
 
 const PORT = Number(process.env.PORT || 10000);
@@ -332,9 +332,28 @@ app.get('/api/export',async(req,res,next)=>{
        scope==='upcoming' ? x.days_until<=30 :
        x.days_until<=days&&!x.greeted)));
     const {wb,ws}=newWorkbook();
+    if(scope==='pending'){
+      // Preserve the seven standard staff columns, adding actionable information
+      // only to the pending-birthday report.
+      ws.getCell('H1').value='Upcoming Birthday Date';
+      ws.getCell('I1').value='Birthday Reminder';
+      for(const cell of ['H1','I1']){
+        ws.getCell(cell).font={bold:true,color:{argb:'FFFFFFFF'}};
+        ws.getCell(cell).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE90032'}};
+      }
+      ws.getColumn('H').width=26;
+      ws.getColumn('H').numFmt='dd mmm yyyy';
+      ws.getColumn('I').width=23;
+      ws.autoFilter={from:'A1',to:'I1'};
+    }
     for(const s of filtered){
-      ws.addRow([s.staff_code,[s.first_name,s.last_name].filter(Boolean).join(' '),s.phone_number||'',
-        displayBirthday(s),s.department,s.job_title,s.email]);
+      const staffRow=[s.staff_code,[s.first_name,s.last_name].filter(Boolean).join(' '),s.phone_number||'',
+        displayBirthday(s),s.department,s.job_title,s.email];
+      if(scope==='pending'){
+        // Store an actual Excel date so report recipients can sort/filter it.
+        staffRow.push(new Date(s.next_birthday+'T00:00:00.000Z'),birthdayCountdownLabel(s.days_until));
+      }
+      ws.addRow(staffRow);
     }
     await sendBook(res,wb,'revolt_birthdays_'+scope+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
   }catch(e){next(e);}
