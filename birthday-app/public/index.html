@@ -27,6 +27,27 @@
     </div>
     <div class="auth-art"><div class="auth-art-inner"><div class="big-present">🎁</div><h2>Small moments.<br/>Stronger teams.</h2><p>Keep the important days close.</p></div></div>
   </section>
+  <section id="passwordChangeLayer" class="auth-layer hidden" aria-label="Required password change">
+    <div class="auth-panel">
+      <div class="brand brand-dark"><span class="brand-r">R</span>evolt<span class="brand-dot">.</span></div><div class="brand-caption dark-caption">Technologies · Birthday Management</div>
+      <p class="eyebrow">SECURE YOUR ACCOUNT</p>
+      <h1>Set your own password.</h1>
+      <p class="muted">Your temporary password must be changed before you can open the birthday dashboard.</p>
+      <p class="password-identity" id="firstPasswordEmail"></p>
+      <form id="firstPasswordForm" class="auth-form">
+        <label for="firstCurrentPassword">Temporary password</label>
+        <input required id="firstCurrentPassword" type="password" autocomplete="current-password" placeholder="Enter your temporary password"/>
+        <label for="firstNewPassword">New password</label>
+        <input required id="firstNewPassword" type="password" autocomplete="new-password" minlength="12" maxlength="256" placeholder="At least 12 characters"/>
+        <label for="firstConfirmPassword">Confirm new password</label>
+        <input required id="firstConfirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="256" placeholder="Re-enter your new password"/>
+        <button type="submit" class="btn btn-primary btn-wide">Change password and continue →</button>
+        <p class="form-error" id="firstPasswordError" role="alert"></p>
+      </form>
+      <button id="firstPasswordSignout" type="button" class="subtle-button first-signout">Sign out instead</button>
+    </div>
+    <div class="auth-art"><div class="auth-art-inner"><div class="big-present">🔐</div><h2>Your account.<br/>Your password.</h2><p>One simple step to protect staff information.</p></div></div>
+  </section>
   <div id="shell" class="shell hidden">
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-logo brand"><span class="brand-r">R</span>evolt<span class="brand-dot">.</span><small class="brand-subtext">Technologies · Birthday Management</small></div>
@@ -34,6 +55,7 @@
         <button class="nav-link active" data-page="birthdays"><span class="nav-symbol">♧</span> Birthdays <span id="navBadge" class="nav-badge">0</span></button>
         <button class="nav-link" data-page="staff"><span class="nav-symbol">♙</span> Staff Directory</button>
         <button class="nav-link" data-page="history"><span class="nav-symbol">◷</span> Greeting History</button>
+        <button class="nav-link" data-page="admins"><span class="nav-symbol">♙</span> Admin Management</button>
         <button class="nav-link" data-page="settings"><span class="nav-symbol">⚙</span> Settings</button>
       </nav>
       <div class="sidebar-bottom"><div class="sidebar-decor"></div><p>Great teams<br/>build great <em>futures.</em></p></div>
@@ -108,6 +130,20 @@
           </div>
           <div class="settings-card imports-card"><h2>Import history</h2><p>Recent Excel uploads and any validation errors.</p><div id="importHistory"></div></div>
         </section>
+        <section id="page-admins" class="page hidden">
+          <div class="page-head">
+            <div><p class="breadcrumb">Home <span>›</span> Access</p><h1>Admin Management</h1>
+              <p class="subtitle">Create accounts, issue temporary passwords and manage administrator access.</p></div>
+            <div class="page-actions"><button id="addAdminButton" type="button" class="btn btn-primary">+ Add administrator</button></div>
+          </div>
+          <section class="settings-card admin-instructions">
+            <span class="admin-intro-icon" aria-hidden="true">🔐</span>
+            <div><h2>Secure administrator onboarding</h2>
+              <p>Each new administrator receives a randomly generated temporary password, shown only once. They must set a new password the first time they sign in. Share the temporary password securely with the intended administrator.</p>
+            </div>
+          </section>
+          <section id="adminTable" class="table-card" aria-label="Administrators"></section>
+        </section>
       </main>
     </div>
   </div>
@@ -146,6 +182,31 @@
   <dialog id="greetingDialog" class="modal">
     <div class="modal-header"><div><p class="eyebrow">MAKE THEIR DAY</p><h2 id="greetingTitle">Send birthday wishes</h2></div><button class="dialog-close" type="button" data-close="greetingDialog">×</button></div>
     <div class="modal-body"><p class="muted" id="greetingHint"></p><label class="full-label">Your message<textarea id="greetingText" rows="5"></textarea></label><div class="message-actions"><button id="copyGreeting" class="btn btn-outline" type="button">Copy message</button><button id="emailGreeting" class="btn btn-primary" type="button">Open email app ↗</button></div><hr class="soft-hr"/><button id="markCelebrated" class="btn btn-soft btn-wide" type="button">✓ Mark as celebrated</button><p class="form-note">Marking as celebrated is a manual record. Opening email does not confirm delivery.</p></div>
+  </dialog>
+  <dialog id="adminDialog" class="modal admin-modal">
+    <div class="modal-header">
+      <div><p class="eyebrow">ACCOUNT MANAGEMENT</p><h2 id="adminDialogTitle">Add administrator</h2></div>
+      <button class="dialog-close" type="button" data-close="adminDialog" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <form id="adminForm" class="auth-form">
+        <p class="muted">Enter the details of the administrator. The application will generate a secure temporary password.</p>
+        <label for="adminName">Full name *</label><input id="adminName" type="text" required minlength="2" maxlength="120" placeholder="Administrator's full name"/>
+        <label for="adminEmail">Email address *</label><input id="adminEmail" type="email" required maxlength="200" autocomplete="off" placeholder="admin@company.com"/>
+        <button class="btn btn-primary btn-wide" type="submit">Create administrator and generate password</button>
+        <p class="form-error" id="adminFormError" role="alert"></p>
+      </form>
+      <section id="adminCredentialPanel" class="hidden" aria-label="One-time temporary password">
+        <div class="credential-notice"><span>✓</span><div><strong id="adminCredentialHeading">Temporary password generated</strong>
+          <p>Copy and share these login details securely. This password will not be shown again after you close this window.</p></div></div>
+        <div class="credential-item"><label>Email address</label><div id="adminCredentialEmail" class="credential-value"></div></div>
+        <div class="credential-item"><label>Temporary password</label>
+          <div class="credential-password-row"><code id="adminTemporaryPassword"></code>
+            <button class="btn btn-outline" id="copyAdminPassword" type="button">Copy</button></div></div>
+        <p class="must-change-note">The administrator will be required to choose a new password at first login.</p>
+        <button id="adminCredentialDone" type="button" class="btn btn-primary btn-wide">Done</button>
+      </section>
+    </div>
   </dialog>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 </body>
