@@ -48,7 +48,11 @@ function parseGrid(rows) {
   if(records.length>2000)throw Error('Import up to 2,000 staff records per file.');
   return records.map((row,index)=>{
     const get=key=>header[key]!==undefined ? normalValue(row[header[key]]) : '';
-    return {row:index+2,staff_code:get('staffid'),name:get('name'),number:get('number'),
+    // CSV spreadsheet clients may need a leading apostrophe to stop '+233...'
+    // being treated as a formula. Remove it only from a validated phone string.
+    const rawNumber=get('number');
+    const number=/^'\+[\d\s().-]{5,35}$/.test(rawNumber) ? rawNumber.slice(1) : rawNumber;
+    return {row:index+2,staff_code:get('staffid'),name:get('name'),number,
       birthday:get('birthday'),department:get('department'),job_title:get('jobtitle'),email:get('email')};
   });
 }
