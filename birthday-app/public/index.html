@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <meta name="theme-color" content="#101418"/>
+  <meta name="theme-color" content="#251924"/>
+  <meta name="application-name" content="Revolt - Technologies Birthday Management"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-title" content="Revolt Birthdays"/>
+  <link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg"/>
+  <link rel="shortcut icon" href="/favicon.svg"/>
+  <link rel="manifest" href="/manifest.webmanifest"/>
   <meta name="description" content="Revolt Staff Birthdays — celebrate your colleagues, manage employee dates, and plan upcoming celebrations."/>
   <title>Revolt - Technologies Birthday Management</title>
   <link rel="stylesheet" href="/styles.css"/>
@@ -13,7 +19,7 @@
   <div id="loading" class="loading-screen"><div class="loader"></div><p>Opening Revolt Birthdays...</p></div>
   <section id="authLayer" class="auth-layer hidden" aria-label="Administrator sign in">
     <div class="auth-panel">
-      <div class="brand brand-dark"><span class="brand-r">R</span>evolt<span class="brand-dot">.</span></div><div class="brand-caption dark-caption">Technologies · Birthday Management</div>
+      <div class="brand brand-dark"><img src="/favicon.svg" class="auth-brand-icon" width="40" height="40" alt=""/><span class="brand-r">R</span>evolt<span class="brand-dot">.</span></div><div class="brand-caption dark-caption">Technologies · Birthday Management</div>
       <p class="eyebrow">WELCOME BACK</p>
       <h1>Celebrate your people.</h1>
       <p class="muted">Sign in to manage birthdays, reminders and staff records.</p>
@@ -50,7 +56,7 @@
   </section>
   <div id="shell" class="shell hidden">
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-logo brand"><span class="brand-r">R</span>evolt<span class="brand-dot">.</span><small class="brand-subtext">Technologies · Birthday Management</small></div>
+      <div class="sidebar-logo brand"><img class="brand-symbol" src="/favicon.svg" alt="" width="34" height="34"/><span class="brand-wordmark"><span class="brand-r">R</span>evolt<span class="brand-dot">.</span><small class="brand-subtext">Technologies · Birthday Management</small></span></div>
       <nav class="nav-menu" aria-label="Main navigation">
         <button class="nav-link active" data-page="birthdays"><span class="nav-symbol">♧</span> Birthdays <span id="navBadge" class="nav-badge">0</span></button>
         <button class="nav-link" data-page="staff"><span class="nav-symbol">♙</span> Staff Directory</button>
@@ -60,14 +66,15 @@
       </nav>
       <div class="sidebar-bottom"><div class="sidebar-decor"></div><p>Great teams<br/>build great <em>futures.</em></p></div>
     </aside>
+    <button id="sidebarBackdrop" class="sidebar-backdrop" type="button" aria-label="Close navigation" tabindex="-1"></button>
     <div class="main-area">
       <header class="topbar">
-        <button id="mobileMenuBtn" type="button" class="icon-button mobile-menu" aria-label="Open menu">☰</button>
+        <button id="mobileMenuBtn" type="button" class="icon-button mobile-menu" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">☰</button>
         <div class="top-search"><span>⌕</span><input id="globalSearch" type="search" placeholder="Search people or departments..." aria-label="Search staff"/></div>
         <div class="topbar-right">
           <button class="icon-button notifications-button" id="notificationButton" title="Show pending birthdays" aria-label="Show pending birthdays">♧ <small id="topBadge">0</small></button>
           <div class="profile"><div class="profile-avatar">R</div><div class="profile-text"><b>Revolt Admin</b><small id="profileEmail">Administrator</small></div></div>
-          <button id="logoutButton" class="logout-button" title="Sign out">Sign out</button>
+          <button id="logoutButton" class="logout-button" title="Sign out" aria-label="Sign out">Sign out</button>
         </div>
       </header>
       <main class="content">
