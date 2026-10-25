@@ -1,0 +1,34 @@
+# Revolt Staff Birthdays
+
+A separate staff birthday management application using the supplied Revolt dashboard design. The repository's website `main` branch is unchanged. This app lives only on the `revolt-staff-birthdays` branch under `birthday-app/`.
+
+## Features
+
+- Secure admin sign-in, password change, Postgres-backed sessions, access-controlled exports.
+- Staff creation/editing/deactivation, searchable directory, department filters, privacy opt-out.
+- Today's birthdays, calendar, next 30 days, pending greetings and congratulation messages.
+- Export pending birthdays or all staff to Excel, Excel template, validated Excel import with upsert by Staff ID, import history.
+- Leap-day birthdays observed on 28 February in non-leap years; Accra/UTC calendar dates.
+- Responsive desktop, tablet and mobile layout adapted from reference.
+
+## Running locally
+
+```sh
+cd birthday-app
+npm install
+DATABASE_URL='postgresql://...' ADMIN_EMAIL='admin@example.com' ADMIN_PASSWORD='set-a-long-unique-secret' npm start
+```
+
+At startup the service creates missing tables and the first admin only if none exists. `ADMIN_PASSWORD` must be at least 12 characters. Remove the bootstrap password environment variable after the first successful login; it is never rendered to the browser. To run tests use `npm test`.
+
+## Render deployment
+
+Runtime Node 22, region Frankfurt, build command `cd birthday-app && npm install --no-audit --no-fund`, start command `cd birthday-app && npm start`; service health route `/health`. Set `DATABASE_URL` to the private Neon connection URL, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `NODE_ENV=production`. Use a dedicated web service bound to branch `revolt-staff-birthdays` rather than the existing Revolt website service. The database `revolt_birthdays` belongs to the new Neon project.
+
+## Excel columns
+
+Staff ID, First Name, Last Name, Birth Day, Birth Month, Birth Year, Department, Job Title, Email, Employment Status, Hide From Celebrations. Staff ID is required and used for safe updates. Month and day are required; birth year may be blank. Use the downloadable template, and check row-level errors in import results.
+
+## Security notes
+
+This is an admin-managed standalone service, not automatically connected to Revolt OS staff authentication. Do not make it publicly editable. Use a strong secret, enable Render managed HTTPS, and ensure your staffing and data privacy policies permit birthday information to be stored. Email sending is not configured; sharing birthday wishes opens the administrator's email client. In-app notifications are generated from stored staff records. The initial empty state is intentional; no sample employees are inserted.
