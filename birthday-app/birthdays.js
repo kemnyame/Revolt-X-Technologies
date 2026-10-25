@@ -20,4 +20,11 @@ function staffWithBirthday(staff, reference = new Date(), greetedDates = new Set
   return { ...staff, next_birthday: next.date, days_until: next.daysUntil,
     greeted: greetedDates.has(String(staff.id) + ':' + next.date) };
 }
-module.exports = { isLeap, isValidBirthday, observedDate, nextBirthday, staffWithBirthday };
+// Human-readable countdown used by pending-birthday spreadsheet reports.
+function birthdayCountdownLabel(daysUntil) {
+  if (!Number.isInteger(daysUntil) || daysUntil < 0) throw new Error('Invalid upcoming birthday interval');
+  if (daysUntil === 0) return 'Today';
+  if (daysUntil === 1) return 'Tomorrow';
+  return 'In ' + daysUntil + ' days';
+}
+module.exports = { isLeap, isValidBirthday, observedDate, nextBirthday, staffWithBirthday, birthdayCountdownLabel };
