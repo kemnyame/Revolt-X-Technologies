@@ -1,44 +1,25 @@
-# Revolt-X: Render + PostgreSQL deployment
+# Revolt-X website: Render and Neon
 
-This build uses PostgreSQL instead of SQLite so application data is not stored on the web server's ephemeral filesystem.
+The website uses a Node/Express server on Render and a separate PostgreSQL project on Neon. Public pages stay available when the database is unreachable.
 
-## Local development
-1. Install Node.js 22+ and PostgreSQL.
-2. Create a database named `revoltx`.
-3. Copy `.env.example` to `.env` and set `DATABASE_URL`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` in your shell/environment. (This project intentionally does not load `.env` automatically.)
-4. Run `npm install`.
-5. Run `npm start`.
-6. Open http://localhost:10000 and /admin/ for administration (or use the configured `PORT`).
+## Build and run
 
-The server creates the required PostgreSQL tables automatically at startup and seeds the first administrator if no admin exists.
+1. Run `npm ci`.
+2. Run `npm run build` to generate public pages from `data/site-content.json`.
+3. Apply `db/migrations/001_initial.sql` on a direct database connection, or set `DATABASE_URL_UNPOOLED` and run `npm run migrate`.
+4. Configure `DATABASE_URL` with the pooled application connection. Keep credentials out of source control.
+5. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in protected service configuration. A first administrator is created only when the database has no administrators and the password has at least 12 characters. No public default password is used.
+6. Run `npm start`. The default port is 10000. `PORT` or the preview CLI's `--port` option can override it.
 
-## Availability during a database outage
+Existing administrator password hashes and enquiry records can be imported into the same table structure when a readable backup is available. Migrating the structure does not recover records from an expired, inaccessible database. The old Render database has not been deleted or upgraded as part of this change.
 
-The HTTP server starts independently of PostgreSQL. Public pages, Adriana's answers and solution recommendations remain available if the database is missing or unreachable. Activity logging is best effort; it does not block an assistant response.
+The blueprint now expects a Neon connection rather than creating a new trial database. Existing Render resources must be reviewed before applying a Blueprint deletion plan; committing this file alone does not delete the retained database.
 
-- `/api/health` checks website availability and returns HTTP 200 with `status: "degraded"` and `database: "unavailable"` during an outage. Keep this as the Render health-check path so the public website remains reachable.
-- `/api/health/database` returns HTTP 503 while database features are unavailable and checks connectivity once initialization succeeds.
-- Demo submissions and admin APIs return HTTP 503 with a retry message while the database is unavailable. Failed submissions are not reported as saved, and the demo form keeps the visitor's entries.
-- Database connection attempts and queries have five-second timeouts. Initialization retries every 30 seconds without restarting the website. After connectivity returns, existing database-backed features resume automatically.
+## Checks
 
-This does not restore an expired database or recover its records. Restore the existing database or connect a durable PostgreSQL database separately. Do not replace the connection with an empty database and assume historical enquiries or administrator accounts have been recovered.
+- `npm test` checks page availability, unavailable-database responses and automatic recovery.
+- `scripts/verify-neon.cjs` accepts a JSON object containing `databaseUrl` on stdin. Run only against an isolated verification branch. It creates clearly labelled test enquiries and a test administrator if none exists, then checks sign-in, saved enquiries, follow-up updates, the assistant, the guide and sign-out. It never prints credentials.
+- `/api/health` reports website availability and includes `status: degraded` while the database is offline. This is the Render health-check path.
+- `/api/health/database` returns 503 when database features are unavailable and 200 when the database responds.
 
-Run availability checks with `node --test tests/website-availability.test.js`. They exercise the actual HTTP server with no database, an unresolvable database hostname, and a controlled database outage/recovery. No live customer records or AI provider calls are used.
-
-## Render Blueprint deployment
-1. Push this entire folder to a GitHub repository.
-2. Create a Render Blueprint and select the repository. Render reads `render.yaml`.
-3. When prompted, enter strong values for `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
-4. Apply the Blueprint. It provisions the Node web service and PostgreSQL database and injects `DATABASE_URL` automatically.
-5. When deployment completes, open the generated onrender.com URL.
-6. Test `/api/health`, submit a demo request, then sign in at `/admin/`.
-
-## Important free-tier note
-Render's free web service can sleep after inactivity. Render's free PostgreSQL database is intended for evaluation and currently expires after 30 days. Do not treat the free database as permanent production storage. Before taking real customer data, upgrade the database or move `DATABASE_URL` to a durable PostgreSQL provider.
-
-## Security
-- Never commit `.env` or passwords.
-- Change the initial admin password after first login.
-- Production admin cookies are Secure, HttpOnly and SameSite=Strict.
-- Use a custom domain and HTTPS before commercial launch.
-
+The site uses responsive images, keyboard navigation, readable control contrast and reduced-motion support. Edit shared copy in `data/site-content.json`, shared layouts in `scripts/build-site.cjs`, styles in `public/css/site.css` and interactions in `public/js/app.js`.

@@ -1,287 +1,287 @@
 [
   {
     "slug": "business-intelligence",
-    "icon": "bi-bar-chart-line",
-    "title": "Business Intelligence & Analytics",
-    "summary": "Turn fragmented operational data into dashboards, forecasts, alerts and management decisions.",
+    "title": "Reports & business insights",
+    "category": "Data & connections",
+    "icon": "chart",
+    "summary": "See what is happening in your business without sorting through scattered spreadsheets.",
+    "intro": "Bring your figures together in clear reports. See sales, costs and progress in one place, so your team can make better decisions.",
     "features": [
-      "Executive dashboards",
-      "Data integration",
-      "Forecasting",
-      "Anomaly detection",
-      "Automated reporting",
-      "KPI monitoring"
+      "Easy-to-read dashboards",
+      "Reports from different systems",
+      "Trends and useful alerts",
+      "Reports for your managers"
     ],
     "useCases": [
-      "Retail performance command centre",
-      "Multi-branch executive reporting",
-      "Revenue and margin intelligence"
+      "Compare sales across branches",
+      "Track costs and budgets",
+      "Review your team's progress"
     ]
   },
   {
     "slug": "custom-applications",
-    "icon": "bi-window-stack",
-    "title": "Custom Business Applications",
-    "summary": "Secure applications built around your workflows instead of forcing your business into generic software.",
+    "title": "Business software",
+    "category": "Websites & apps",
+    "icon": "grid",
+    "summary": "Software that fits the way your business works, from daily tasks to larger operations.",
+    "intro": "Some businesses need more than an off-the-shelf app. We design and build software around your people, work and goals.",
     "features": [
-      "Customer and staff portals",
-      "Role-based access",
-      "Workflow engines",
-      "API integrations",
-      "Mobile-responsive systems",
-      "Audit trails"
+      "Tools built around your workflow",
+      "Different access for each role",
+      "Forms, records and approvals",
+      "Connections to the tools you use"
     ],
     "useCases": [
-      "Operations portal",
-      "Dealer/customer platform",
-      "Internal service management"
+      "Replace a paper-based process",
+      "Build a staff or customer portal",
+      "Manage work across branches"
     ]
   },
   {
     "slug": "ai-business-solutions",
-    "icon": "bi-lightning-charge",
-    "title": "AI Business Solutions & Agents",
-    "summary": "Practical assistants and agents that analyse, search, summarise and automate approved business work.",
+    "title": "AI assistants & automation",
+    "category": "AI & automation",
+    "icon": "spark",
+    "summary": "Use AI to answer questions, work with documents and help your team with routine tasks.",
+    "intro": "Start with one useful task. We can help you add an assistant that works with your information and follows the rules your organisation sets.",
     "features": [
-      "Business assistants",
-      "Knowledge assistants",
-      "Task agents",
-      "Generative workflows",
-      "Human approvals",
-      "AI governance"
+      "Assistants for common questions",
+      "Help with documents and summaries",
+      "Search across company information",
+      "Human review for important actions"
     ],
     "useCases": [
-      "Internal policy assistant",
-      "Customer support copilot",
-      "Procurement analysis agent"
+      "Help staff find policy information",
+      "Prepare a first draft or summary",
+      "Guide customers to the right service"
     ]
   },
   {
     "slug": "crm-sales",
-    "icon": "bi-people",
-    "title": "CRM & Sales Intelligence",
-    "summary": "Manage leads and customers while using data to prioritise opportunities and improve conversion.",
+    "title": "Customers & sales",
+    "category": "People & operations",
+    "icon": "people",
+    "summary": "Keep customer details, conversations and sales opportunities in one organised place.",
+    "intro": "Help your team follow up at the right time. Keep a clear view of each customer and where every opportunity stands.",
     "features": [
-      "Lead capture",
-      "Sales pipelines",
-      "Customer profiles",
-      "Follow-up automation",
-      "Lead scoring",
-      "Sales forecasting"
+      "Customer and contact records",
+      "Sales follow-up reminders",
+      "A clear view of opportunities",
+      "Sales reports for your team"
     ],
     "useCases": [
-      "B2B sales CRM",
-      "Dealer lead management",
-      "Customer retention intelligence"
+      "Track new enquiries",
+      "Organise your sales team's work",
+      "See which customers need follow-up"
     ]
   },
   {
     "slug": "inventory-procurement",
-    "icon": "bi-box-seam",
-    "title": "Smart Inventory & Procurement",
-    "summary": "Control stock and purchasing while predicting demand, stock-outs and supplier issues.",
+    "title": "Stock & purchasing",
+    "category": "People & operations",
+    "icon": "box",
+    "summary": "Know what is in stock, what needs ordering and where your purchases stand.",
+    "intro": "Bring stock records and purchasing into one process. Help your team avoid missing items, repeated orders and unclear approvals.",
     "features": [
-      "Multi-location stock",
-      "Purchase workflows",
-      "Supplier management",
-      "Reorder rules",
-      "Demand forecasting",
-      "Dead-stock detection"
+      "Stock records and movements",
+      "Purchase requests and approvals",
+      "Supplier details",
+      "Low-stock alerts and reports"
     ],
     "useCases": [
-      "Pharmacy inventory",
-      "Auto-parts stock control",
-      "Distributor procurement"
+      "Manage a shop or warehouse",
+      "Track stock across locations",
+      "Follow a purchase from request to delivery"
     ]
   },
   {
     "slug": "fleet-logistics",
-    "icon": "bi-truck",
-    "title": "Fleet & Logistics Intelligence",
-    "summary": "Connect vehicles, drivers, trips, maintenance and operational data in one management platform.",
+    "title": "Vehicles & deliveries",
+    "category": "People & operations",
+    "icon": "route",
+    "summary": "Keep vehicle, driver, trip and delivery information together.",
+    "intro": "Make everyday transport work easier to manage. We can connect trip records, maintenance, fuel information and location tools around your operation.",
     "features": [
-      "Vehicle registry",
-      "GPS integration ready",
-      "Driver management",
-      "Maintenance planning",
-      "Fuel analytics",
-      "Route and geofence insights"
+      "Vehicle and driver records",
+      "Trip and delivery planning",
+      "Maintenance reminders",
+      "Fuel and journey reports"
     ],
     "useCases": [
-      "Corporate fleet control",
-      "Delivery operations",
-      "Service fleet management"
+      "Plan delivery work",
+      "Track vehicle maintenance",
+      "Review transport costs"
     ]
   },
   {
     "slug": "property-facility",
-    "icon": "bi-buildings",
-    "title": "Property & Facility Technology",
-    "summary": "Manage property sales, rentals, owners, guests, facilities and performance from one platform.",
+    "title": "Property & facilities",
+    "category": "People & operations",
+    "icon": "building",
+    "summary": "Organise property records, tenants, maintenance and day-to-day facility work.",
+    "intro": "Keep the details of your properties and facilities in one place. Give your team a clear way to handle requests, records and follow-up work.",
     "features": [
-      "Property inventory",
-      "Owner portals",
-      "Rental operations",
-      "Airbnb workflows",
-      "Maintenance",
-      "Revenue analytics"
+      "Property and tenant records",
+      "Maintenance requests",
+      "Rental and occupancy information",
+      "Tasks and management reports"
     ],
     "useCases": [
-      "Apartment ownership portal",
-      "Property sales platform",
-      "Managed short-stay operations"
+      "Manage several properties",
+      "Follow up on repairs",
+      "Organise facility records"
     ]
   },
   {
     "slug": "hr-workforce",
-    "icon": "bi-person-badge",
-    "title": "HR & Workforce Management",
-    "summary": "Digitise employee operations and give management clearer workforce information.",
+    "title": "People & HR",
+    "category": "People & operations",
+    "icon": "people",
+    "summary": "Give your team a simpler way to manage staff records, leave, attendance and payroll work.",
+    "intro": "Spend less time searching for staff information. Bring routine HR tasks together and give each person access to what they need.",
     "features": [
-      "Employee records",
-      "Attendance",
-      "Leave",
-      "Recruitment",
-      "Performance workflows",
-      "Workforce analytics"
+      "Staff information in one place",
+      "Leave requests and approvals",
+      "Attendance records",
+      "Payroll workflows and reports"
     ],
     "useCases": [
-      "Multi-branch HR",
-      "Field workforce management",
-      "Employee self-service"
+      "Keep staff records organised",
+      "Manage leave across teams",
+      "Prepare payroll information"
     ]
   },
   {
     "slug": "workflow-automation",
-    "icon": "bi-diagram-3",
-    "title": "Workflow & Process Automation",
-    "summary": "Replace email chains, paper forms and repetitive administration with controlled digital workflows.",
+    "title": "Tasks & approvals",
+    "category": "AI & automation",
+    "icon": "flow",
+    "summary": "Replace repeated emails and paper forms with clear steps, reminders and approvals.",
+    "intro": "Make it clear who needs to do what next. We help you turn a routine process into a simple, trackable workflow.",
     "features": [
-      "Digital forms",
-      "Approval routing",
-      "Notifications",
-      "SLA tracking",
-      "Audit trails",
-      "Process analytics"
+      "Digital forms and requests",
+      "Steps and approval rules",
+      "Reminders and notifications",
+      "A record of what happened"
     ],
     "useCases": [
-      "Procurement approvals",
-      "Service requests",
-      "Document approvals"
+      "Approve purchases or leave",
+      "Track requests between teams",
+      "Reduce repeated data entry"
     ]
   },
   {
     "slug": "enterprise-data",
-    "icon": "bi-database-check",
-    "title": "Enterprise AI & Data Platforms",
-    "summary": "Create a secure data and knowledge foundation for analytics, search, automation and intelligent applications.",
+    "title": "Company knowledge & data",
+    "category": "Data & connections",
+    "icon": "database",
+    "summary": "Make company information easier to find, use and share with the right people.",
+    "intro": "Connect important documents and data so your team can find reliable answers. Set clear access rules for different users and information.",
     "features": [
-      "Data pipelines",
-      "Data warehouses",
-      "Private knowledge search",
-      "Document intelligence",
-      "Access controls",
-      "API layer"
+      "Organised company information",
+      "Document search",
+      "Access based on each person's role",
+      "Information ready for reports and AI tools"
     ],
     "useCases": [
-      "Enterprise knowledge hub",
-      "Management data platform",
-      "Document intelligence portal"
+      "Find policies and procedures",
+      "Bring scattered data together",
+      "Prepare information for an AI assistant"
     ]
   },
   {
     "slug": "digital-platforms",
-    "icon": "bi-layers",
-    "title": "Digital Platforms & Customer Experiences",
-    "summary": "Create connected portals, marketplaces and digital services that make it easier for customers, partners and teams to interact with your organisation.",
+    "title": "Customer & partner portals",
+    "category": "Websites & apps",
+    "icon": "globe",
+    "summary": "Give customers, partners or suppliers a clear place to work with your business online.",
+    "intro": "Create an online space where people can access services, send requests and follow their progress without endless calls or emails.",
     "features": [
-      "Customer and partner portals",
-      "Marketplaces and service platforms",
-      "Booking and transaction journeys",
-      "Account and self-service experiences",
-      "Payments and notifications",
-      "Experience analytics"
+      "Customer and partner accounts",
+      "Online forms and services",
+      "Updates on requests",
+      "Connections to your internal tools"
     ],
     "useCases": [
-      "Customer self-service portal",
-      "Multi-sided marketplace",
-      "Digital service platform"
+      "Build a customer service portal",
+      "Create an online marketplace",
+      "Share information with partners"
     ]
   },
   {
     "slug": "web-mobile",
-    "icon": "bi-phone",
-    "title": "Web, Mobile & Experience Technology",
-    "summary": "Design modern digital experiences across web and mobile without limiting the solution to a single channel or device.",
+    "title": "Websites & mobile apps",
+    "category": "Websites & apps",
+    "icon": "phone",
+    "summary": "Clear, modern websites and apps that are easy to use on phones, tablets and computers.",
+    "intro": "Help people understand what you offer and get things done. We plan, design and build digital experiences around the people who will use them.",
     "features": [
-      "Responsive web experiences",
-      "Web applications",
-      "Mobile applications",
-      "Progressive experiences",
-      "Accessible interface design",
-      "Connected back-office workflows"
+      "Clear page layouts and wording",
+      "Layouts for different screen sizes",
+      "Accessible navigation and forms",
+      "The same service on your website and app"
     ],
     "useCases": [
-      "Customer mobile experience",
-      "Operational web application",
-      "Modern corporate digital experience"
+      "Refresh a company website",
+      "Build an app for staff or customers",
+      "Make an existing service easier to use"
     ]
   },
   {
     "slug": "iot-connected",
-    "icon": "bi-broadcast-pin",
-    "title": "IoT, Smart Assets & Connected Operations",
-    "summary": "Connect physical assets, devices and operational signals to software so teams can monitor, respond and make better decisions.",
+    "title": "Devices & equipment",
+    "category": "Data & connections",
+    "icon": "connect",
+    "summary": "Connect equipment and device information to the software your team uses.",
+    "intro": "Turn useful signals from the physical world into information your team can act on. The setup depends on your devices, network and operating needs.",
     "features": [
-      "GPS and telemetry integration",
-      "Sensor and device data",
-      "Asset monitoring",
-      "Operational alerts",
-      "Location-aware workflows",
-      "Connected dashboards"
+      "Device and equipment information",
+      "Useful readings and alerts",
+      "Connected monitoring dashboards",
+      "Links to operational workflows"
     ],
     "useCases": [
-      "Smart fleet operations",
-      "Equipment monitoring",
-      "Connected facility operations"
+      "Monitor equipment conditions",
+      "Receive an alert when a reading changes",
+      "Bring device data into a business report"
     ]
   },
   {
     "slug": "integration-cloud",
-    "icon": "bi-cloud-arrow-up",
-    "title": "Systems Integration & Cloud Technology",
-    "summary": "Connect applications, APIs, data and cloud infrastructure so technology works as one environment instead of isolated tools.",
+    "title": "Connect your systems",
+    "category": "Data & connections",
+    "icon": "connect",
+    "summary": "Help your apps share information, so your team spends less time copying it between tools.",
+    "intro": "You do not always need to start again. We can connect existing systems and help you use cloud services that fit your business.",
     "features": [
-      "API integration",
-      "Cloud deployment",
-      "Identity and authentication",
-      "Payments and communications",
-      "Data exchange",
-      "Integration monitoring"
+      "Connections between applications",
+      "Data shared between systems",
+      "Set up your software online",
+      "Support for existing tools"
     ],
     "useCases": [
-      "Connect existing business systems",
-      "Cloud-ready application deployment",
-      "Payment and messaging integration"
+      "Link sales and accounting tools",
+      "Connect a website to business software",
+      "Reduce duplicate records"
     ]
   },
   {
     "slug": "technology-modernisation",
-    "icon": "bi-arrow-repeat",
-    "title": "Technology Modernisation & Digital Transformation",
-    "summary": "Modernise outdated, manual or fragmented operations and create a practical path from legacy technology to connected digital work.",
+    "title": "Improve existing software",
+    "category": "Websites & apps",
+    "icon": "refresh",
+    "summary": "Update older systems and make everyday work easier without changing everything at once.",
+    "intro": "Start with what is getting in the way. We review your current tools, agree on practical improvements and build a clear path forward.",
     "features": [
-      "Legacy system assessment",
-      "Spreadsheet replacement",
-      "Process redesign",
-      "Application modernisation",
-      "Data migration",
-      "Phased transformation roadmaps"
+      "A review of your current tools",
+      "Better screens and workflows",
+      "A phased improvement plan",
+      "Help moving data and connecting systems"
     ],
     "useCases": [
-      "Replace spreadsheet-led operations",
-      "Modernise an internal legacy system",
-      "Digitise a manual service process"
+      "Replace an awkward manual process",
+      "Refresh an older application",
+      "Bring separate tools together"
     ]
   }
 ]

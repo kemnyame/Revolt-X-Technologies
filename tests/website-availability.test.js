@@ -50,7 +50,7 @@ async function assertPublicWebsite(request){
  const answer=await request('/api/assistant',{question:'What is Revolt-X OS?'});
  assert.equal(answer.status,200);assert.match((await answer.json()).answer,/Revolt-X OS/);
  const advisor=await request('/api/advisor',{problem:'Manage warehouse inventory and stock'});
- assert.equal(advisor.status,200);assert.match((await advisor.json()).solution,/Inventory/i);
+ assert.equal(advisor.status,200);assert.match((await advisor.json()).solution,/Stock/i);
 }
 
 async function assertUnavailableWrites(request){
@@ -94,6 +94,7 @@ class Pool extends EventEmitter{
   const state=JSON.parse(fs.readFileSync(process.env.TEST_DATABASE_STATE,'utf8'));
   if(!state.online){const error=new Error('Test database unavailable');error.code='ENOTFOUND';throw error}
   if(state.failLogs&&/INSERT INTO (assistant_logs|advisor_logs)/.test(sql)){const error=new Error('Test log failure');error.code='42P01';throw error}
+  if(/SELECT version FROM website_migrations/.test(sql))return {rows:[{version:'001_initial'}]};
   if(/SELECT COUNT/.test(sql))return {rows:[{n:1}]};
   if(/INSERT INTO demo_requests/.test(sql))fs.writeFileSync(process.env.TEST_DATABASE_SAVED,JSON.stringify(params));
   return {rows:[]};
@@ -116,7 +117,7 @@ global.setInterval=(fn,ms,...args)=>interval(fn,ms===30000?60:ms,...args);
  await assertPublicWebsite(request);
  await waitFor(()=>logs().includes('Activity logging unavailable:'));
  const saved=await request('/api/demo',demo);
- assert.equal(saved.status,200);assert.equal((await saved.json()).ok,true);
+ assert.equal(saved.status,201);assert.equal((await saved.json()).ok,true);
  assert.equal(JSON.parse(await readFile(savedPath,'utf8'))[0],demo.name);
  await writeFile(statePath,JSON.stringify({online:false}));
  assert.equal((await request('/api/demo',demo)).status,503);
@@ -124,5 +125,5 @@ global.setInterval=(fn,ms,...args)=>interval(fn,ms===30000?60:ms,...args);
  await assertUnavailableWrites(request);
  await writeFile(statePath,JSON.stringify({online:true}));
  await waitFor(async()=>(await (await request('/api/health')).json()).status==='ready');
- assert.equal((await request('/api/demo',demo)).status,200);
+ assert.equal((await request('/api/demo',demo)).status,201);
 });

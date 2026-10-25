@@ -1,17 +1,15 @@
 {
   "name": "revolt-x-commercial-platform",
-  "version":"3.3.0",
+  "version": "4.0.0",
   "private": true,
   "type": "commonjs",
-  "engines": {
-    "node": "22.x"
-  },
+  "engines": { "node": "22.x" },
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "build": "node scripts/build-site.cjs",
+    "migrate": "node scripts/migrate.cjs",
+    "test": "node --test tests/website-availability.test.js"
   },
-  "dependencies": {
-    "express": "^5.1.0",
-    "pg": "^8.16.3"
-  }
+  "dependencies": { "express": "^5.1.0", "pg": "^8.16.3" }
 }
