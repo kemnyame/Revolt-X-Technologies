@@ -299,3 +299,5 @@ h2{letter-spacing:-.5px}
  .list-help{margin-bottom:10px}
 }
 @media (prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important;animation:none!important}}
+
+.person-description{min-width:0}
