@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="theme-color" content="#101418"/>
   <meta name="description" content="Revolt Staff Birthdays — celebrate your colleagues, manage employee dates, and plan upcoming celebrations."/>
-  <title>Staff Birthdays | Revolt</title>
+  <title>Revolt - Technologies Birthday Management</title>
   <link rel="stylesheet" href="/styles.css"/>
   <script src="/app.js" defer></script>
 </head>
@@ -13,7 +13,7 @@
   <div id="loading" class="loading-screen"><div class="loader"></div><p>Opening Revolt Birthdays...</p></div>
   <section id="authLayer" class="auth-layer hidden" aria-label="Administrator sign in">
     <div class="auth-panel">
-      <div class="brand brand-dark"><span class="brand-r">R</span>evolt<span class="brand-dot">.</span></div>
+      <div class="brand brand-dark"><span class="brand-r">R</span>evolt<span class="brand-dot">.</span></div><div class="brand-caption dark-caption">Technologies · Birthday Management</div>
       <p class="eyebrow">WELCOME BACK</p>
       <h1>Celebrate your people.</h1>
       <p class="muted">Sign in to manage birthdays, reminders and staff records.</p>
@@ -23,13 +23,13 @@
         <button type="submit" class="btn btn-primary btn-wide">Sign in <span>→</span></button>
         <p class="form-error" id="loginError" role="alert"></p>
       </form>
-      <p class="auth-footer">Protected staff records · Revolt Technologies</p>
+      <p class="auth-footer">Revolt - Technologies Birthday Management · Protected staff records</p>
     </div>
     <div class="auth-art"><div class="auth-art-inner"><div class="big-present">🎁</div><h2>Small moments.<br/>Stronger teams.</h2><p>Keep the important days close.</p></div></div>
   </section>
   <div id="shell" class="shell hidden">
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-logo brand"><span class="brand-r">R</span>evolt<span class="brand-dot">.</span></div>
+      <div class="sidebar-logo brand"><span class="brand-r">R</span>evolt<span class="brand-dot">.</span><small class="brand-subtext">Technologies · Birthday Management</small></div>
       <nav class="nav-menu" aria-label="Main navigation">
         <button class="nav-link active" data-page="birthdays"><span class="nav-symbol">♧</span> Birthdays <span id="navBadge" class="nav-badge">0</span></button>
         <button class="nav-link" data-page="staff"><span class="nav-symbol">♙</span> Staff Directory</button>
@@ -51,7 +51,7 @@
       <main class="content">
         <section id="page-birthdays" class="page">
           <div class="page-head">
-            <div><p class="breadcrumb">Home <span>›</span> Notifications</p><h1>Birthdays</h1><p class="subtitle">Celebrate your colleagues and make their special day even brighter.</p></div>
+            <div><p class="breadcrumb">Home <span>›</span> Notifications</p><h1>Birthday Management</h1><p class="subtitle">Celebrate your colleagues and make their special day even brighter.</p></div>
             <div class="page-actions"><button id="addFromHome" class="btn btn-outline">+ Add staff</button><button id="exportPending" class="btn btn-primary">↓ Export pending birthdays</button></div>
           </div>
           <div class="dashboard-grid">
