@@ -22,7 +22,7 @@
  }
 
  const tabs=$$('[data-tab]');
- function selectTab(button){tabs.forEach(tab=>{const selected=tab===button;tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;const panel=$('#'+tab.dataset.tab);panel.hidden=!selected;if(selected&&!reducedMotion.matches)panel.animate([{opacity:.2,transform:'translateY(8px)'},{opacity:1,transform:'translateY(0)'}],{duration:250,easing:'ease-out'})})}
+ function selectTab(button){$$('[data-platform-visual]').forEach(visual=>{visual.hidden=visual.dataset.platformVisual!==button.dataset.tab});tabs.forEach(tab=>{const selected=tab===button;tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;const panel=$('#'+tab.dataset.tab);panel.hidden=!selected;if(selected&&!reducedMotion.matches)panel.animate([{opacity:.2,transform:'translateY(8px)'},{opacity:1,transform:'translateY(0)'}],{duration:250,easing:'ease-out'})})}
  tabs.forEach((tab,index)=>{tab.addEventListener('click',()=>selectTab(tab));tab.addEventListener('keydown',event=>{let next;if(event.key==='ArrowRight')next=(index+1)%tabs.length;else if(event.key==='ArrowLeft')next=(index+tabs.length-1)%tabs.length;else if(event.key==='Home')next=0;else if(event.key==='End')next=tabs.length-1;else return;event.preventDefault();selectTab(tabs[next]);tabs[next].focus()})});
 
  const search=$('#solutionSearch'),filters=$$('[data-filter]'),cards=$$('#solutionsGrid [data-category]');
@@ -57,6 +57,7 @@
  const toggle=$('#assistantToggle'),panel=$('#assistantPanel'),close=$('#assistantClose'),chat=$('#chatMessages'),form=$('#assistantForm'),input=$('#assistantInput');
  function setAssistant(open){if(!panel)return;panel.hidden=!open;toggle.setAttribute('aria-expanded',String(open));if(open){setMenu(false);input.focus()}else toggle.focus()}
  toggle?.addEventListener('click',()=>setAssistant(panel.hidden));close?.addEventListener('click',()=>setAssistant(false));
+ $$('[data-open-assistant]').forEach(button=>button.addEventListener('click',()=>setAssistant(true)));
  document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(panel&&!panel.hidden){setAssistant(false);return}if(menuToggle?.getAttribute('aria-expanded')==='true'){setMenu(false);menuToggle.focus();return}closeDropdowns()});
  function message(text,kind){const bubble=document.createElement('div');bubble.className='chat-message '+kind;bubble.textContent=text;chat.appendChild(bubble);chat.scrollTop=chat.scrollHeight;return bubble}
  $$('.chat-prompts button').forEach(button=>button.addEventListener('click',()=>{input.value=button.textContent;form.requestSubmit()}));

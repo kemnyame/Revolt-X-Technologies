@@ -16,7 +16,16 @@
       "Compare sales across branches",
       "Track costs and budgets",
       "Review your team's progress"
-    ]
+    ],
+    "example": {
+      "title": "See sales across your branches.",
+      "steps": [
+        "Bring the agreed sales figures together.",
+        "Compare locations and time periods in one report.",
+        "Give managers a clear view of changes to review."
+      ],
+      "bring": "Which decisions should the report help you make, and where are those figures kept?"
+    }
   },
   {
     "slug": "custom-applications",
@@ -35,7 +44,16 @@
       "Replace a paper-based process",
       "Build a staff or customer portal",
       "Manage work across branches"
-    ]
+    ],
+    "example": {
+      "title": "Replace a paper request with a shared record.",
+      "steps": [
+        "A team member fills in a clear online form.",
+        "The right person reviews and updates the request.",
+        "Everyone with access can see its status and history."
+      ],
+      "bring": "Show us a typical form, spreadsheet or task, and explain who uses it."
+    }
   },
   {
     "slug": "ai-business-solutions",
@@ -54,7 +72,16 @@
       "Help staff find policy information",
       "Prepare a first draft or summary",
       "Guide customers to the right service"
-    ]
+    ],
+    "example": {
+      "title": "Help staff find a policy answer.",
+      "steps": [
+        "Connect the documents your organisation agrees to use.",
+        "A staff member asks a question in everyday language.",
+        "The assistant prepares an answer for the person to check."
+      ],
+      "bring": "Which questions come up often, and which documents should provide the answers?"
+    }
   },
   {
     "slug": "crm-sales",
@@ -73,7 +100,16 @@
       "Track new enquiries",
       "Organise your sales team's work",
       "See which customers need follow-up"
-    ]
+    ],
+    "example": {
+      "title": "Follow an enquiry through to the next conversation.",
+      "steps": [
+        "Record a new enquiry and the customer’s details.",
+        "Assign the follow-up to someone on your team.",
+        "Review open opportunities and what needs attention."
+      ],
+      "bring": "How do enquiries reach you, and what should happen before a sale is complete?"
+    }
   },
   {
     "slug": "inventory-procurement",
@@ -92,7 +128,16 @@
       "Manage a shop or warehouse",
       "Track stock across locations",
       "Follow a purchase from request to delivery"
-    ]
+    ],
+    "example": {
+      "title": "Keep a purchase moving from request to delivery.",
+      "steps": [
+        "Record the stock or supplies your team needs.",
+        "Send the request through the agreed approval steps.",
+        "Update the order and stock records when items arrive."
+      ],
+      "bring": "What do you buy, where is it stored, and who approves an order?"
+    }
   },
   {
     "slug": "fleet-logistics",
@@ -111,7 +156,16 @@
       "Plan delivery work",
       "Track vehicle maintenance",
       "Review transport costs"
-    ]
+    ],
+    "example": {
+      "title": "Plan a delivery and keep the trip details together.",
+      "steps": [
+        "Assign a vehicle and driver to the planned work.",
+        "Keep trip, fuel and delivery information with that record.",
+        "Review upcoming maintenance and transport costs."
+      ],
+      "bring": "Tell us about your vehicles, deliveries and any tracking tools you already use."
+    }
   },
   {
     "slug": "property-facility",
@@ -130,7 +184,16 @@
       "Manage several properties",
       "Follow up on repairs",
       "Organise facility records"
-    ]
+    ],
+    "example": {
+      "title": "Follow a repair from report to completion.",
+      "steps": [
+        "Record the issue against the right property.",
+        "Assign the maintenance work and track its progress.",
+        "Keep an update and a record of the completed work."
+      ],
+      "bring": "Which properties do you manage, and how are repairs reported today?"
+    }
   },
   {
     "slug": "hr-workforce",
@@ -149,7 +212,16 @@
       "Keep staff records organised",
       "Manage leave across teams",
       "Prepare payroll information"
-    ]
+    ],
+    "example": {
+      "title": "Make leave requests easier to manage.",
+      "steps": [
+        "A staff member submits the dates they need.",
+        "The responsible person reviews the request.",
+        "The team keeps a shared record of the decision."
+      ],
+      "bring": "How do you keep staff records, and which leave or payroll rules must the tool follow?"
+    }
   },
   {
     "slug": "workflow-automation",
@@ -168,7 +240,16 @@
       "Approve purchases or leave",
       "Track requests between teams",
       "Reduce repeated data entry"
-    ]
+    ],
+    "example": {
+      "title": "Give every purchase request a clear next step.",
+      "steps": [
+        "Collect the details in one request form.",
+        "Send it to the approver defined by your rules.",
+        "Notify the requester and keep a record of the decision."
+      ],
+      "bring": "Walk us through one process, including the people, rules and handovers involved."
+    }
   },
   {
     "slug": "enterprise-data",
@@ -187,7 +268,16 @@
       "Find policies and procedures",
       "Bring scattered data together",
       "Prepare information for an AI assistant"
-    ]
+    ],
+    "example": {
+      "title": "Make company guidance easier to find.",
+      "steps": [
+        "Organise the documents and information people need.",
+        "Set access around the roles in your organisation.",
+        "Help staff find the right material through search."
+      ],
+      "bring": "Where is your information now, who owns it, and who should be able to use it?"
+    }
   },
   {
     "slug": "digital-platforms",
@@ -206,7 +296,16 @@
       "Build a customer service portal",
       "Create an online marketplace",
       "Share information with partners"
-    ]
+    ],
+    "example": {
+      "title": "Let a customer follow a service request online.",
+      "steps": [
+        "The customer signs in and sends a request.",
+        "Your team reviews it in the connected workflow.",
+        "The customer checks its progress in the portal."
+      ],
+      "bring": "Who will use the portal, and which requests or information should they access?"
+    }
   },
   {
     "slug": "web-mobile",
@@ -225,7 +324,16 @@
       "Refresh a company website",
       "Build an app for staff or customers",
       "Make an existing service easier to use"
-    ]
+    ],
+    "example": {
+      "title": "Turn a website visit into a useful next step.",
+      "steps": [
+        "Help visitors understand your services quickly.",
+        "Guide them to the right page or online form.",
+        "Make the same journey easy on a phone or computer."
+      ],
+      "bring": "Who are you trying to reach, and what should they be able to do on your site or app?"
+    }
   },
   {
     "slug": "iot-connected",
@@ -244,7 +352,16 @@
       "Monitor equipment conditions",
       "Receive an alert when a reading changes",
       "Bring device data into a business report"
-    ]
+    ],
+    "example": {
+      "title": "Turn an equipment reading into a useful alert.",
+      "steps": [
+        "Connect the agreed device readings to your software.",
+        "Show the information in a monitoring view.",
+        "Alert the right people when a defined reading changes."
+      ],
+      "bring": "Which devices, readings and network connections are available at your site?"
+    }
   },
   {
     "slug": "integration-cloud",
@@ -263,7 +380,16 @@
       "Link sales and accounting tools",
       "Connect a website to business software",
       "Reduce duplicate records"
-    ]
+    ],
+    "example": {
+      "title": "Stop copying the same record into two tools.",
+      "steps": [
+        "Agree which system holds the original record.",
+        "Connect the tools using the access they support.",
+        "Share agreed updates and track connection issues."
+      ],
+      "bring": "Which tools need to share information, and what access do their providers allow?"
+    }
   },
   {
     "slug": "technology-modernisation",
@@ -282,6 +408,15 @@
       "Replace an awkward manual process",
       "Refresh an older application",
       "Bring separate tools together"
-    ]
+    ],
+    "example": {
+      "title": "Improve an older tool one step at a time.",
+      "steps": [
+        "Review the screens and tasks causing difficulty.",
+        "Agree which changes will make the biggest difference.",
+        "Update and test in stages with the people using it."
+      ],
+      "bring": "Show us the current software, what works and where people get stuck."
+    }
   }
 ]
