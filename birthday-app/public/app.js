@@ -6,7 +6,7 @@ const state = {
   selectedDay:null,editId:null,greetingId:null,history:[],query:''
 };
 const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
-function escapeHtml(value){const d=document.createElement('div');d.textContent=String(value??'');return d.innerHTML;}
+function escapeHtml(value){const d=document.createElement('div');d.textContent=String(value??'');return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function shortDate(value){return new Intl.DateTimeFormat('en-GB',{timeZone:'UTC',day:'2-digit',month:'short',year:'numeric'}).format(new Date(String(value)+'T00:00:00Z'));}
 function dayLabel(d){return d===0?'Today':d===1?'Tomorrow':'In '+d+' days';}
 function nameOf(s){return s.first_name+' '+s.last_name;}
@@ -19,7 +19,7 @@ function avatar(s){
     : '<span class="avatar color-'+color+'" aria-label="'+safeName+'">'+escapeHtml(initials(s))+'</span>';
 }
 function personInfo(s){
-  return '<div class="person-info">'+avatar(s)+'<div style="min-width:0"><h3>'+escapeHtml(nameOf(s))+'</h3><p>'+escapeHtml(s.job_title||s.department||s.staff_code)+'</p></div></div>';
+  return '<div class="person-info">'+avatar(s)+'<div class="person-description"><h3>'+escapeHtml(nameOf(s))+'</h3><p>'+escapeHtml(s.job_title||s.department||s.staff_code)+'</p></div></div>';
 }
 let toastTimer;
 function toast(msg){$('toast').textContent=msg;$('toast').classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.add('hidden'),4500);}
@@ -98,7 +98,10 @@ function birthdaysForFilter(){
   if(state.filter==='month')return base.filter(s=>s.birth_month===new Date().getUTCMonth()+1)
     .sort((a,b)=>a.birth_day-b.birth_day);
   if(state.filter==='calendar'&&state.selectedDay){
-    return base.filter(s=>s.birth_month===state.selectedDay.month&&s.birth_day===state.selectedDay.day);
+    const sel=state.selectedDay;
+    const leap=sel.year%4===0&&(sel.year%100!==0||sel.year%400===0);
+    return base.filter(s=>s.birth_month===sel.month&&(s.birth_day===sel.day||
+      (sel.month===2&&sel.day===28&&!leap&&s.birth_day===29)));
   }
   return base.sort((a,b)=>a.days_until-b.days_until);
 }
@@ -243,7 +246,7 @@ function sendGreetingEmail(){
   const s=state.data.staff.find(x=>x.id===state.greetingId);
   if(!s?.email)return toast('Add a staff email address first.');
   const subject='Happy Birthday, '+s.first_name+'!';
-  const mailto='mailto:'+encodeURIComponent(s.email)+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent($('greetingText').value);
+  const mailto='mailto:'+s.email+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent($('greetingText').value);
   window.location.href=mailto;
 }
 async function importExcel(e){
