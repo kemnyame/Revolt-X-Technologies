@@ -36,11 +36,20 @@ async function api(url,options={}){
   return body;
 }
 function showLogin(){
-  $('loading').classList.add('hidden');$('shell').classList.add('hidden');$('authLayer').classList.remove('hidden');
+  $('loading').classList.add('hidden');$('shell').classList.add('hidden');
+  $('passwordChangeLayer').classList.add('hidden');$('authLayer').classList.remove('hidden');
   $('loginError').textContent='';
 }
 function showApp(){
-  $('loading').classList.add('hidden');$('authLayer').classList.add('hidden');$('shell').classList.remove('hidden');
+  $('loading').classList.add('hidden');$('authLayer').classList.add('hidden');
+  $('passwordChangeLayer').classList.add('hidden');$('shell').classList.remove('hidden');
+}
+function showRequiredPasswordChange(email){
+  $('loading').classList.add('hidden');$('shell').classList.add('hidden');
+  $('authLayer').classList.add('hidden');$('passwordChangeLayer').classList.remove('hidden');
+  $('firstPasswordEmail').textContent=email;
+  $('firstPasswordForm').reset();
+  $('firstPasswordError').textContent='';
 }
 async function download(url,fallback){
   try{
@@ -196,13 +205,14 @@ async function renderImports(){
   }catch(e){toast(e.message);}
 }
 function navigate(page){
-  if(!['birthdays','staff','history','settings'].includes(page))return;
+  if(!['birthdays','staff','history','settings','admins'].includes(page))return;
   state.page=page;
   document.querySelectorAll('.page').forEach(p=>p.classList.toggle('hidden',p.id!=='page-'+page));
   document.querySelectorAll('.nav-link').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
   $('sidebar').classList.remove('open');window.scrollTo({top:0,behavior:'smooth'});
   if(page==='history')renderHistory();
   if(page==='settings')renderImports();
+  if(page==='admins')renderAdmins();
 }
 function openStaff(id=null){
   state.editId=id;
@@ -273,9 +283,99 @@ async function importExcel(e){
     toast('Birthday import completed.');if(state.page==='settings')renderImports();
   }catch(e){result.innerHTML='<p class="import-errors">'+escapeHtml(e.message)+'</p>';}finally{button.disabled=false;}
 }
+async function renderAdmins(){
+  try{
+    const data=await api('/api/admins'),list=data.admins||[];
+    if(!list.length){
+      $('adminTable').innerHTML='<div class="empty-state"><h3>No administrators found</h3></div>';
+      return;
+    }
+    $('adminTable').innerHTML='<table class="directory-table"><thead><tr>'+
+      '<th>Administrator</th><th>Account status</th><th>Initial password</th><th>Last login</th><th>Actions</th></tr></thead><tbody>'+
+      list.map(a=>{
+        const self=a.id===data.current_admin_id;
+        const status=a.is_active?'<span class="status-chip">Active</span>':'<span class="status-chip inactive">Suspended</span>';
+        const first=a.must_change_password?'<span class="privacy-chip">Change required</span>':'<span class="status-chip">Completed</span>';
+        const last=a.last_login_at?new Date(a.last_login_at).toLocaleString('en-GB'):'Not yet';
+        const actions=self?'<span class="muted">Current account</span>':
+          '<button type="button" class="small-action" data-reset-admin="'+escapeHtml(a.id)+'" '+(!a.is_active?'disabled':'')+'>Reset password</button> '+
+          '<button type="button" class="small-action" data-toggle-admin="'+escapeHtml(a.id)+'" data-active="'+(a.is_active?'false':'true')+'">'+
+          (a.is_active?'Suspend':'Reactivate')+'</button>';
+        return '<tr><td><strong>'+escapeHtml(a.full_name||'Administrator')+
+          '</strong><br/><span class="muted">'+escapeHtml(a.email)+'</span></td><td>'+status+'</td><td>'+first+
+          '</td><td>'+escapeHtml(last)+'</td><td>'+actions+'</td></tr>';
+      }).join('')+'</tbody></table>';
+  }catch(e){toast(e.message);}
+}
+function openAdminForm(){
+  $('adminDialogTitle').textContent='Add administrator';
+  $('adminForm').reset();
+  $('adminFormError').textContent='';
+  $('adminForm').classList.remove('hidden');
+  $('adminCredentialPanel').classList.add('hidden');
+  $('adminTemporaryPassword').textContent='';
+  $('adminDialog').showModal();
+}
+function showAdminCredential(admin,password,heading){
+  $('adminForm').classList.add('hidden');
+  $('adminDialogTitle').textContent='Temporary password generated';
+  $('adminCredentialPanel').classList.remove('hidden');
+  $('adminCredentialHeading').textContent=heading;
+  $('adminCredentialEmail').textContent=admin.email;
+  $('adminTemporaryPassword').textContent=password;
+  if(!$('adminDialog').open)$('adminDialog').showModal();
+}
+async function createAdmin(e){
+  e.preventDefault();
+  const button=$('adminForm').querySelector('button[type="submit"]');
+  button.disabled=true;$('adminFormError').textContent='';
+  try{
+    const result=await api('/api/admins',{method:'POST',body:{
+      full_name:$('adminName').value.trim(),email:$('adminEmail').value.trim()
+    }});
+    showAdminCredential(result.admin,result.temporary_password,'Administrator created successfully');
+    await renderAdmins();
+  }catch(err){$('adminFormError').textContent=err.message;}finally{button.disabled=false;}
+}
+async function resetAdminPassword(id){
+  if(!window.confirm('Reset this administrator password? Their existing sessions will be signed out.'))return;
+  try{
+    const result=await api('/api/admins/'+encodeURIComponent(id)+'/reset-password',{method:'POST'});
+    showAdminCredential(result.admin,result.temporary_password,'Password reset successfully');
+    await renderAdmins();
+  }catch(err){toast(err.message);}
+}
+async function setAdminStatus(id,isActive){
+  if(!window.confirm((isActive?'Reactivate':'Suspend')+' this administrator account?'))return;
+  try{
+    await api('/api/admins/'+encodeURIComponent(id)+'/status',{method:'PATCH',body:{is_active:isActive}});
+    await renderAdmins();toast(isActive?'Administrator reactivated.':'Administrator suspended.');
+  }catch(err){toast(err.message);}
+}
+async function changeInitialPassword(e){
+  e.preventDefault();
+  const current=$('firstCurrentPassword').value;
+  const next=$('firstNewPassword').value;
+  const confirm=$('firstConfirmPassword').value;
+  const error=$('firstPasswordError');
+  error.textContent='';
+  if(next!==confirm){error.textContent='The new passwords do not match.';return;}
+  if(next===current){error.textContent='Your new password must be different from your temporary password.';return;}
+  const button=$('firstPasswordForm').querySelector('button[type="submit"]');button.disabled=true;
+  try{
+    await api('/api/account/password',{method:'POST',body:{current,next}});
+    $('firstPasswordForm').reset();
+    showApp();
+    navigate('birthdays');
+    await refresh(true);
+    toast('Password changed. Welcome to Birthday Management!');
+  }catch(err){error.textContent=err.message;}finally{button.disabled=false;}
+}
 async function init(){
   try{
-    const user=await api('/api/me');$('profileEmail').textContent=user.email;showApp();await refresh(true);
+    const user=await api('/api/me');$('profileEmail').textContent=user.email;
+    if(user.must_change_password){showRequiredPasswordChange(user.email);return;}
+    showApp();await refresh(true);
   }catch{showLogin();}
 }
 $('loginForm').addEventListener('submit',async e=>{
@@ -283,10 +383,34 @@ $('loginForm').addEventListener('submit',async e=>{
   $('loginError').textContent='';
   try{
     const user=await api('/api/login',{method:'POST',body:{email:$('loginEmail').value,password:$('loginPassword').value}});
-    $('profileEmail').textContent=user.email;$('loginPassword').value='';showApp();await refresh(true);
+    $('profileEmail').textContent=user.email;$('loginPassword').value='';
+    if(user.must_change_password){showRequiredPasswordChange(user.email);return;}
+    showApp();await refresh(true);
   }catch(err){$('loginError').textContent=err.message;}finally{submit.disabled=false;}
 });
-$('logoutButton').addEventListener('click',async()=>{try{await api('/api/logout',{method:'POST'});}catch{}showLogin();});
+async function logout(){try{await api('/api/logout',{method:'POST'});}catch{}showLogin();}
+$('logoutButton').addEventListener('click',logout);
+$('firstPasswordSignout').addEventListener('click',logout);
+$('firstPasswordForm').addEventListener('submit',changeInitialPassword);
+$('addAdminButton').addEventListener('click',openAdminForm);
+$('adminForm').addEventListener('submit',createAdmin);
+$('adminTable').addEventListener('click',e=>{
+  const reset=e.target.closest('[data-reset-admin]');
+  if(reset){resetAdminPassword(reset.dataset.resetAdmin);return;}
+  const toggle=e.target.closest('[data-toggle-admin]');
+  if(toggle)setAdminStatus(toggle.dataset.toggleAdmin,toggle.dataset.active==='true');
+});
+$('copyAdminPassword').addEventListener('click',async()=>{
+  try{await navigator.clipboard.writeText($('adminTemporaryPassword').textContent);toast('Temporary password copied.');}
+  catch{toast('Select the temporary password and copy it manually.');}
+});
+$('adminCredentialDone').addEventListener('click',()=>$('adminDialog').close());
+$('adminDialog').addEventListener('close',()=>{
+  // Plaintext temporary passwords live only in this one-time dialog.
+  $('adminTemporaryPassword').textContent='';
+  $('adminCredentialEmail').textContent='';
+  $('adminForm').reset();$('adminCredentialPanel').classList.add('hidden');
+});
 document.querySelectorAll('.nav-link').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));
 $('mobileMenuBtn').addEventListener('click',()=>$('sidebar').classList.toggle('open'));
 $('globalSearch').addEventListener('input',e=>{state.query=e.target.value;renderBirthdays();renderDirectory();});
