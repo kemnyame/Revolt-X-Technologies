@@ -33,7 +33,7 @@ test('XLS export is a real Excel 97-2003 file that imports again',async()=>{
 test('PDF export is a real readable PDF and its table can be imported',async()=>{
   const out=await exportContent('pdf',STAFF_HEADERS,[row],'all');
   assert.equal(out.mime,'application/pdf');
-  assert.equal(out.buffer.subarray(0,4).toString('%s'),'%PDF');
+  assert.equal(out.buffer.subarray(0,4).toString('utf8'),'%PDF');
   const records=await importRecords(out.buffer,'birthdays.pdf');
   assert.equal(records.length,1);
   assert.equal(records[0].name,'Akosua Mensah');
