@@ -343,3 +343,9 @@ h2{letter-spacing:-.5px}
 .form-grid .form-full-width{grid-column:1/-1}
 .directory-table .person-info h3{font-size:12px}
 @media(max-width:620px){.form-grid .form-full-width{grid-column:auto}}
+
+/* File format selectors for pending and directory reports */
+.export-format{min-height:42px;max-width:190px;border:1px solid #d8e0e9;border-radius:12px;background:#fff;color:#2d435c;font-size:12px;font-weight:650;padding:0 12px;cursor:pointer}
+.export-format:focus-visible{outline:3px solid #e94e6f77;outline-offset:2px}
+.pdf-note{margin-top:10px!important;margin-bottom:9px!important;font-size:12px;color:#765981;line-height:1.5}
+@media(max-width:620px){.export-format{max-width:none;flex:1 1 100%;width:100%;}.page-actions>.export-format{flex:1 1 100%}.page-actions>.btn{flex:1 1 auto}}
