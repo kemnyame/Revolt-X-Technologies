@@ -100,7 +100,8 @@ app.use('/api',requireAdmin);
 app.use('/api',(req,res,next)=>{
   // This guard applies to all protected APIs, including exports and staff data.
   // A newly created or reset administrator can only change their password or sign out.
-  if(req.admin.must_change_password && !['/api/me','/api/account/password','/api/logout'].includes(req.path)){
+  const routePath=req.originalUrl.split('?')[0];
+  if(req.admin.must_change_password && !['/api/me','/api/account/password','/api/logout'].includes(routePath)){
     return res.status(403).json({error:'Change your temporary password to continue.',password_change_required:true});
   }
   next();
