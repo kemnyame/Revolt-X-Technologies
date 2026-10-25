@@ -39,7 +39,15 @@ async function api(url,options={}){
   }
   return body;
 }
+function setMobileMenu(open){
+  const enabled=Boolean(open)&&window.innerWidth<=960;
+  $('sidebar').classList.toggle('open',enabled);
+  document.body.classList.toggle('nav-open',enabled);
+  $('mobileMenuBtn').setAttribute('aria-expanded',String(enabled));
+  $('mobileMenuBtn').setAttribute('aria-label',enabled?'Close menu':'Open menu');
+}
 function showLogin(){
+  setMobileMenu(false);
   $('loading').classList.add('hidden');$('shell').classList.add('hidden');
   $('passwordChangeLayer').classList.add('hidden');$('authLayer').classList.remove('hidden');
   $('loginError').textContent='';
@@ -184,14 +192,14 @@ function renderDirectory(){
   $('staffTable').innerHTML='<table class="directory-table"><thead><tr>'+
     '<th>Staff ID</th><th>Name</th><th>Number</th><th>Birthday</th><th>Department</th><th>Job Title</th><th>Email</th><th>Action</th>'+
     '</tr></thead><tbody>'+
-    list.map(s=>'<tr><td><strong>'+escapeHtml(s.staff_code)+'</strong></td>'+
-      '<td>'+personInfo(s)+'</td>'+
-      '<td>'+escapeHtml(s.phone_number||'—')+'</td>'+
-      '<td>'+escapeHtml(formatStaffBirthday(s))+'</td>'+
-      '<td>'+escapeHtml(s.department||'—')+'</td>'+
-      '<td>'+escapeHtml(s.job_title||'—')+'</td>'+
-      '<td>'+escapeHtml(s.email||'—')+'</td>'+
-      '<td><button class="small-action" data-edit="'+escapeHtml(s.id)+'">Edit</button></td></tr>').join('')+
+    list.map(s=>'<tr><td data-label="Staff ID"><strong>'+escapeHtml(s.staff_code)+'</strong></td>'+
+      '<td data-label="Name">'+personInfo(s)+'</td>'+
+      '<td data-label="Number">'+escapeHtml(s.phone_number||'—')+'</td>'+
+      '<td data-label="Birthday">'+escapeHtml(formatStaffBirthday(s))+'</td>'+
+      '<td data-label="Department">'+escapeHtml(s.department||'—')+'</td>'+
+      '<td data-label="Job Title">'+escapeHtml(s.job_title||'—')+'</td>'+
+      '<td data-label="Email">'+escapeHtml(s.email||'—')+'</td>'+
+      '<td data-label="Action"><button class="small-action" data-edit="'+escapeHtml(s.id)+'">Edit</button></td></tr>').join('')+
     '</tbody></table>';
 }
 async function renderHistory(){
@@ -220,7 +228,7 @@ function navigate(page){
   state.page=page;
   document.querySelectorAll('.page').forEach(p=>p.classList.toggle('hidden',p.id!=='page-'+page));
   document.querySelectorAll('.nav-link').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
-  $('sidebar').classList.remove('open');window.scrollTo({top:0,behavior:'smooth'});
+  setMobileMenu(false);window.scrollTo({top:0,behavior:'smooth'});
   if(page==='history')renderHistory();
   if(page==='settings')renderImports();
   if(page==='admins')renderAdmins();
@@ -439,7 +447,10 @@ $('adminDialog').addEventListener('close',()=>{
   $('adminForm').reset();$('adminCredentialPanel').classList.add('hidden');
 });
 document.querySelectorAll('.nav-link').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));
-$('mobileMenuBtn').addEventListener('click',()=>$('sidebar').classList.toggle('open'));
+$('mobileMenuBtn').addEventListener('click',()=>setMobileMenu(!$('sidebar').classList.contains('open')));
+$('sidebarBackdrop').addEventListener('click',()=>setMobileMenu(false));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')setMobileMenu(false);});
+window.addEventListener('resize',()=>{if(window.innerWidth>960)setMobileMenu(false);});
 $('globalSearch').addEventListener('input',e=>{state.query=e.target.value;renderBirthdays();renderDirectory();});
 $('notificationButton').addEventListener('click',()=>{navigate('birthdays');state.filter='pending';renderBirthdays();});
 document.querySelectorAll('.pill-tab').forEach(b=>b.addEventListener('click',()=>{state.filter=b.dataset.filter;state.selectedDay=null;renderBirthdays();renderCalendar();}));
