@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="theme-color" content="#101418"/>
+  <meta name="description" content="Revolt Staff Birthdays — celebrate your colleagues, manage employee dates, and plan upcoming celebrations."/>
+  <title>Staff Birthdays | Revolt</title>
+  <link rel="stylesheet" href="/styles.css"/>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div id="loading" class="loading-screen"><div class="loader"></div><p>Opening Revolt Birthdays...</p></div>
+  <section id="authLayer" class="auth-layer hidden" aria-label="Administrator sign in">
+    <div class="auth-panel">
+      <div class="brand brand-dark"><span class="brand-r">R</span>evolt<span class="brand-dot">.</span></div>
+      <p class="eyebrow">WELCOME BACK</p>
+      <h1>Celebrate your people.</h1>
+      <p class="muted">Sign in to manage birthdays, reminders and staff records.</p>
+      <form id="loginForm" class="auth-form">
+        <label for="loginEmail">Work email</label><input required id="loginEmail" type="email" autocomplete="username" placeholder="name@company.com"/>
+        <label for="loginPassword">Password</label><input required id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter password"/>
+        <button type="submit" class="btn btn-primary btn-wide">Sign in <span>→</span></button>
+        <p class="form-error" id="loginError" role="alert"></p>
+      </form>
+      <p class="auth-footer">Protected staff records · Revolt Technologies</p>
+    </div>
+    <div class="auth-art"><div class="auth-art-inner"><div class="big-present">🎁</div><h2>Small moments.<br/>Stronger teams.</h2><p>Keep the important days close.</p></div></div>
+  </section>
+  <div id="shell" class="shell hidden">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo brand"><span class="brand-r">R</span>evolt<span class="brand-dot">.</span></div>
+      <nav class="nav-menu" aria-label="Main navigation">
+        <button class="nav-link active" data-page="birthdays"><span class="nav-symbol">♧</span> Birthdays <span id="navBadge" class="nav-badge">0</span></button>
+        <button class="nav-link" data-page="staff"><span class="nav-symbol">♙</span> Staff Directory</button>
+        <button class="nav-link" data-page="history"><span class="nav-symbol">◷</span> Greeting History</button>
+        <button class="nav-link" data-page="settings"><span class="nav-symbol">⚙</span> Settings</button>
+      </nav>
+      <div class="sidebar-bottom"><div class="sidebar-decor"></div><p>Great teams<br/>build great <em>futures.</em></p></div>
+    </aside>
+    <div class="main-area">
+      <header class="topbar">
+        <button id="mobileMenuBtn" type="button" class="icon-button mobile-menu" aria-label="Open menu">☰</button>
+        <div class="top-search"><span>⌕</span><input id="globalSearch" type="search" placeholder="Search people or departments..." aria-label="Search staff"/></div>
+        <div class="topbar-right">
+          <button class="icon-button notifications-button" id="notificationButton" title="Show pending birthdays" aria-label="Show pending birthdays">♧ <small id="topBadge">0</small></button>
+          <div class="profile"><div class="profile-avatar">R</div><div class="profile-text"><b>Revolt Admin</b><small id="profileEmail">Administrator</small></div></div>
+          <button id="logoutButton" class="logout-button" title="Sign out">Sign out</button>
+        </div>
+      </header>
+      <main class="content">
+        <section id="page-birthdays" class="page">
+          <div class="page-head">
+            <div><p class="breadcrumb">Home <span>›</span> Notifications</p><h1>Birthdays</h1><p class="subtitle">Celebrate your colleagues and make their special day even brighter.</p></div>
+            <div class="page-actions"><button id="addFromHome" class="btn btn-outline">+ Add staff</button><button id="exportPending" class="btn btn-primary">↓ Export pending birthdays</button></div>
+          </div>
+          <div class="dashboard-grid">
+            <div class="dashboard-main">
+              <article class="birthday-banner">
+                <div class="banner-content"><div class="banner-icon">♕</div><div class="banner-text"><div id="bannerEyebrow" class="banner-label">Your team, celebrated</div><h2 id="bannerTitle">Every birthday matters.</h2><p id="bannerSubtitle">Add your staff to get started with upcoming birthdays.</p><button id="bannerButton" class="btn btn-primary">View upcoming <span>→</span></button></div></div>
+                <div class="banner-visual" aria-hidden="true"><div class="confetti c1"></div><div class="confetti c2"></div><div class="confetti c3"></div><div class="confetti c4"></div><div class="banner-glow"></div><div class="hero-gift">🎂</div><span class="handwriting">Happy<br/>Birthday!</span></div>
+              </article>
+              <div class="section-bar">
+                <div class="pill-tabs" role="tablist" aria-label="Birthday list filter">
+                  <button class="pill-tab active" data-filter="upcoming">Upcoming</button>
+                  <button class="pill-tab" data-filter="month">This Month</button>
+                  <button class="pill-tab" data-filter="all">All Birthdays</button>
+                  <button class="pill-tab" data-filter="pending">Pending</button>
+                </div>
+                <button id="refreshButton" class="subtle-button">↻ Refresh</button>
+              </div>
+              <div class="list-title-row"><h2 id="listTitle">Upcoming Birthdays</h2><span id="listCount" class="list-count">0 people</span></div>
+              <section id="birthdayList" class="birthday-list" aria-label="Birthdays"></section>
+              <div class="list-help">Only active staff who have opted in to celebrations appear here. Pending birthdays are those not yet marked as celebrated.</div>
+            </div>
+            <aside class="dashboard-side">
+              <section class="side-card calendar-card">
+                <div class="calendar-head"><h3 id="calendarMonth">October 2026</h3><div class="calendar-controls"><button id="prevMonth" aria-label="Previous month">‹</button><button id="nextMonth" aria-label="Next month">›</button></div></div>
+                <div class="calendar-weekdays"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+                <div id="calendarGrid" class="calendar-grid" aria-label="Birthday calendar"></div>
+                <p class="calendar-legend"><span></span> Dates with birthdays</p>
+              </section>
+              <section class="side-card encourage-card"><span class="tiny-gift">🎁</span><div><h3>Make it special!</h3><p>A simple message can go a long way. Celebrate your colleagues!</p><button id="encourageButton" class="text-link">Send a birthday message <span>→</span></button></div></section>
+              <section class="side-card stat-card"><h3><span class="stat-icon">♧</span> Birthday Stats</h3><div class="stats-row"><div><b id="statMonth">0</b><small>This Month</small></div><div><b id="statStaff">0</b><small>Active Staff</small></div><div><b id="statUpcoming">0</b><small>Next 30 Days</small></div></div></section>
+              <section class="side-promo"><span class="promo-icon">♧</span><h3>Stronger together.</h3><p>We celebrate our people,<br/>our greatest asset.</p></section>
+            </aside>
+          </div>
+        </section>
+        <section id="page-staff" class="page hidden">
+          <div class="page-head"><div><p class="breadcrumb">Home <span>›</span> People</p><h1>Staff Directory</h1><p class="subtitle">Manage employee birthdays and celebration preferences.</p></div>
+          <div class="page-actions"><button id="templateButton" class="btn btn-outline">↓ Excel template</button><button id="importButton" class="btn btn-outline">↑ Import Excel</button><button id="exportAllButton" class="btn btn-outline">↓ Export all</button><button id="addStaffButton" class="btn btn-primary">+ Add staff</button></div></div>
+          <div class="filter-strip"><label>Department <select id="departmentFilter"><option value="">All departments</option></select></label><label>Status <select id="statusFilter"><option value="">All staff</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label><span id="directoryCount"></span></div>
+          <section id="staffTable" class="table-card"></section>
+        </section>
+        <section id="page-history" class="page hidden">
+          <div class="page-head"><div><p class="breadcrumb">Home <span>›</span> Notifications</p><h1>Greeting History</h1><p class="subtitle">A record of birthdays marked as celebrated. This does not indicate an email was sent.</p></div></div>
+          <section id="greetingHistory" class="table-card"></section>
+        </section>
+        <section id="page-settings" class="page hidden">
+          <div class="page-head"><div><p class="breadcrumb">Home <span>›</span> Preferences</p><h1>Settings</h1><p class="subtitle">Manage your reminders, security and Excel import records.</p></div></div>
+          <div class="settings-grid">
+            <section class="settings-card"><h2>Birthday reminders</h2><p>Choose how far ahead a birthday appears in your pending reminders and pending Excel export.</p>
+              <form id="reminderForm"><label for="reminderDays">Reminder window</label><select id="reminderDays"><option value="7">7 days</option><option value="14">14 days</option><option value="30">30 days</option><option value="60">60 days</option></select><button type="submit" class="btn btn-primary">Save preference</button></form>
+            </section>
+            <section class="settings-card"><h2>Change password</h2><p>Update the password for this birthday administration account.</p>
+              <form id="passwordForm"><label for="currentPassword">Current password</label><input type="password" id="currentPassword" autocomplete="current-password" required/><label for="newPassword">New password (minimum 12 characters)</label><input type="password" id="newPassword" autocomplete="new-password" minlength="12" required/><button type="submit" class="btn btn-primary">Change password</button></form>
+            </section>
+          </div>
+          <div class="settings-card imports-card"><h2>Import history</h2><p>Recent Excel uploads and any validation errors.</p><div id="importHistory"></div></div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="staffDialog" class="modal">
+    <form id="staffForm" method="dialog">
+      <div class="modal-header"><div><p class="eyebrow">PEOPLE</p><h2 id="staffModalTitle">Add staff member</h2></div><button class="dialog-close" type="button" data-close="staffDialog" aria-label="Close">×</button></div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <label>Staff ID *<input name="staff_code" required maxlength="32" placeholder="e.g. STF-000021"/></label>
+          <label>Department<input name="department" maxlength="100" placeholder="e.g. Finance"/></label>
+          <label>First name *<input name="first_name" required maxlength="80"/></label>
+          <label>Last name *<input name="last_name" required maxlength="80"/></label>
+          <label>Birth day *<input name="birth_day" type="number" min="1" max="31" required/></label>
+          <label>Birth month *<select name="birth_month" id="staffBirthMonth" required><option value="">Select month</option><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select></label>
+          <label>Birth year (optional)<input name="birth_year" type="number" min="1900" max="2100" placeholder="Optional"/></label>
+          <label>Job title<input name="job_title" maxlength="120" placeholder="e.g. Operations Officer"/></label>
+          <label>Email address<input name="email" type="email" maxlength="200" placeholder="name@company.com"/></label>
+          <label>Status<select name="employment_status"><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
+        </div>
+        <label class="checkbox-label"><input type="checkbox" name="hide_from_celebrations"/> Keep this employee out of public birthday celebrations</label>
+        <p class="form-note">Birth year is optional. Use the staff ID to keep records unique during Excel imports.</p>
+        <p class="form-error" id="staffError" role="alert"></p>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline" data-close="staffDialog">Cancel</button><button type="submit" class="btn btn-primary">Save staff</button></div>
+    </form>
+  </dialog>
+  <dialog id="importDialog" class="modal">
+    <div class="modal-header"><div><p class="eyebrow">EXCEL IMPORT</p><h2>Import staff birthdays</h2></div><button class="dialog-close" type="button" data-close="importDialog">×</button></div>
+    <div class="modal-body">
+      <p class="muted">Use the template to add up to 2,000 staff at once. Existing records with the same Staff ID will be updated. Incorrect rows will be skipped and reported.</p>
+      <form id="importForm"><label class="upload-zone">📁 <strong>Choose .xlsx file</strong><span>Maximum file size: 3 MB</span><input required name="file" accept=".xlsx" type="file"/></label><button class="btn btn-primary btn-wide" type="submit">Import birthdays</button></form>
+      <div id="importResult"></div>
+    </div>
+  </dialog>
+  <dialog id="greetingDialog" class="modal">
+    <div class="modal-header"><div><p class="eyebrow">MAKE THEIR DAY</p><h2 id="greetingTitle">Send birthday wishes</h2></div><button class="dialog-close" type="button" data-close="greetingDialog">×</button></div>
+    <div class="modal-body"><p class="muted" id="greetingHint"></p><label class="full-label">Your message<textarea id="greetingText" rows="5"></textarea></label><div class="message-actions"><button id="copyGreeting" class="btn btn-outline" type="button">Copy message</button><button id="emailGreeting" class="btn btn-primary" type="button">Open email app ↗</button></div><hr class="soft-hr"/><button id="markCelebrated" class="btn btn-soft btn-wide" type="button">✓ Mark as celebrated</button><p class="form-note">Marking as celebrated is a manual record. Opening email does not confirm delivery.</p></div>
+  </dialog>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+</body>
+</html>
