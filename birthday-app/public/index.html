@@ -109,7 +109,7 @@
           </div>
         </section>
         <section id="page-staff" class="page hidden">
-          <div class="page-head"><div><p class="breadcrumb">Home <span>›</span> People</p><h1>Staff Directory</h1><p class="subtitle">Manage employee birthdays and celebration preferences.</p></div>
+          <div class="page-head"><div><p class="breadcrumb">Home <span>›</span> People</p><h1>Staff Directory</h1><p class="subtitle">Add and edit staff using seven simple details. Import or export the same fields in Excel.</p></div>
           <div class="page-actions"><button id="templateButton" class="btn btn-outline">↓ Excel template</button><button id="importButton" class="btn btn-outline">↑ Import Excel</button><button id="exportAllButton" class="btn btn-outline">↓ Export all</button><button id="addStaffButton" class="btn btn-primary">+ Add staff</button></div></div>
           <div class="filter-strip"><label>Department <select id="departmentFilter"><option value="">All departments</option></select></label><label>Status <select id="statusFilter"><option value="">All staff</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label><span id="directoryCount"></span></div>
           <section id="staffTable" class="table-card"></section>
@@ -150,31 +150,33 @@
 
   <dialog id="staffDialog" class="modal">
     <form id="staffForm" method="dialog">
-      <div class="modal-header"><div><p class="eyebrow">PEOPLE</p><h2 id="staffModalTitle">Add staff member</h2></div><button class="dialog-close" type="button" data-close="staffDialog" aria-label="Close">×</button></div>
+      <div class="modal-header">
+        <div><p class="eyebrow">STAFF DETAILS</p><h2 id="staffModalTitle">Add staff member</h2></div>
+        <button class="dialog-close" type="button" data-close="staffDialog" aria-label="Close">×</button>
+      </div>
       <div class="modal-body">
         <div class="form-grid">
-          <label>Staff ID *<input name="staff_code" required maxlength="32" placeholder="e.g. STF-000021"/></label>
+          <label>Staff ID *<input name="staff_code" required maxlength="32" placeholder="e.g. STF-001"/></label>
+          <label>Name *<input name="name" required maxlength="160" placeholder="Full name"/></label>
+          <label>Number<input name="number" type="tel" maxlength="40" placeholder="e.g. 0241234567"/></label>
+          <label>Birthday *<input name="birthday" required placeholder="DD/MM/YYYY or DD/MM" autocomplete="off" maxlength="10"/></label>
           <label>Department<input name="department" maxlength="100" placeholder="e.g. Finance"/></label>
-          <label>First name *<input name="first_name" required maxlength="80"/></label>
-          <label>Last name *<input name="last_name" required maxlength="80"/></label>
-          <label>Birth day *<input name="birth_day" type="number" min="1" max="31" required/></label>
-          <label>Birth month *<select name="birth_month" id="staffBirthMonth" required><option value="">Select month</option><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select></label>
-          <label>Birth year (optional)<input name="birth_year" type="number" min="1900" max="2100" placeholder="Optional"/></label>
-          <label>Job title<input name="job_title" maxlength="120" placeholder="e.g. Operations Officer"/></label>
-          <label>Email address<input name="email" type="email" maxlength="200" placeholder="name@company.com"/></label>
-          <label>Status<select name="employment_status"><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
+          <label>Job Title<input name="job_title" maxlength="120" placeholder="e.g. Officer"/></label>
+          <label class="form-full-width">Email<input name="email" type="email" maxlength="200" placeholder="name@company.com"/></label>
         </div>
-        <label class="checkbox-label"><input type="checkbox" name="hide_from_celebrations"/> Keep this employee out of public birthday celebrations</label>
-        <p class="form-note">Birth year is optional. Use the staff ID to keep records unique during Excel imports.</p>
+        <p class="form-note">Enter the birthday as DD/MM/YYYY, or DD/MM if the birth year is not available. Staff ID must be unique.</p>
         <p class="form-error" id="staffError" role="alert"></p>
       </div>
-      <div class="modal-footer"><button type="button" class="btn btn-outline" data-close="staffDialog">Cancel</button><button type="submit" class="btn btn-primary">Save staff</button></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" data-close="staffDialog">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save staff</button>
+      </div>
     </form>
   </dialog>
   <dialog id="importDialog" class="modal">
     <div class="modal-header"><div><p class="eyebrow">EXCEL IMPORT</p><h2>Import staff birthdays</h2></div><button class="dialog-close" type="button" data-close="importDialog">×</button></div>
     <div class="modal-body">
-      <p class="muted">Use the template to add up to 2,000 staff at once. Existing records with the same Staff ID will be updated. Incorrect rows will be skipped and reported.</p>
+      <p class="muted">The Excel file needs just seven columns: <strong>Staff ID, Name, Number, Birthday, Department, Job Title, Email.</strong> Use DD/MM/YYYY for birthdays. Import up to 2,000 records; matching Staff IDs are updated, and any invalid rows are reported.</p>
       <form id="importForm"><label class="upload-zone">📁 <strong>Choose .xlsx file</strong><span>Maximum file size: 3 MB</span><input required name="file" accept=".xlsx" type="file"/></label><button class="btn btn-primary btn-wide" type="submit">Import birthdays</button></form>
       <div id="importResult"></div>
     </div>
