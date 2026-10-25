@@ -308,3 +308,33 @@ h2{letter-spacing:-.5px}
 .brand-caption{font-size:12px;letter-spacing:.055em;font-weight:700;color:#65748b}
 .dark-caption{margin-top:-69px;margin-bottom:66px}
 @media(max-width:620px){.dark-caption{margin-top:-54px;margin-bottom:54px}}
+
+
+/* Administrator Management */
+.admin-instructions{display:flex;align-items:flex-start;gap:18px;margin-bottom:22px;background:linear-gradient(115deg,#fff8f9,#fff);}
+.admin-instructions h2{margin:0 0 9px;font-size:17px;}
+.admin-instructions p{font-size:13px;line-height:1.65;color:#70829b;margin:0;max-width:790px;}
+.admin-intro-icon{width:48px;height:48px;min-width:48px;display:grid;place-items:center;border-radius:13px;background:#fff0f3;font-size:25px;}
+.admin-modal .auth-form{gap:11px;}
+.admin-modal .auth-form .muted{font-size:13px;margin-bottom:9px;}
+.admin-modal .auth-form input{margin-bottom:5px;}
+.credential-notice{display:flex;align-items:flex-start;gap:13px;background:#effaf3;padding:17px;border:1px solid #d7f0df;border-radius:12px;margin-bottom:22px;}
+.credential-notice>span{display:grid;place-items:center;flex:0 0 31px;height:31px;border-radius:50%;background:#1b9656;color:white;font-weight:800;}
+.credential-notice strong{font-size:13px;color:#205a3d;}
+.credential-notice p{margin:6px 0 0;font-size:12px;color:#567768;line-height:1.6;}
+.credential-item{margin-bottom:17px;}
+.credential-item label{display:block;color:#6a7c94;font-size:11px;font-weight:700;margin-bottom:9px;}
+.credential-value{background:#f4f6f9;border:1px solid #e5eaf1;border-radius:10px;padding:13px;color:#273a55;font-size:14px;overflow-wrap:anywhere;}
+.credential-password-row{display:flex;align-items:center;gap:9px;}
+.credential-password-row code{display:block;flex:1;min-width:0;overflow-wrap:anywhere;background:#f5f7fa;padding:15px;border-radius:10px;border:1px solid #e6eaf0;color:#1b2b42;font-weight:700;font-size:14px;}
+.credential-password-row button{flex:0 0 auto;}
+.must-change-note{background:#fff5e9;color:#8e621f;padding:12px;border-radius:9px;font-size:12px;line-height:1.6;margin:14px 0 21px;}
+.password-identity{display:inline-block;font-size:12px;color:#5c6880;background:#f4f6fa;padding:10px 13px;border-radius:8px;margin-bottom:16px;overflow-wrap:anywhere;}
+.first-signout{margin-top:25px;padding:5px 0;}
+.small-action:disabled{cursor:not-allowed;opacity:.42;}
+@media(max-width:620px){
+ .admin-instructions{padding:18px;gap:10px;}
+ .admin-intro-icon{width:38px;height:38px;min-width:38px;font-size:18px;}
+ .credential-password-row{align-items:stretch;flex-direction:column;}
+ .credential-password-row button{width:100%;}
+}
