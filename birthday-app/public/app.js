@@ -116,9 +116,20 @@ function renderBirthdays(){
     $('birthdayList').innerHTML='<div class="empty-state"><span class="empty-illustration">🎂</span><h3>No birthdays to show</h3><p>'+(state.data.staff.length?'Try another filter or search for someone else.':'Your team celebration list will appear once staff birthdays are added.')+'</p></div>';
     return;
   }
-  $('birthdayList').innerHTML=list.map(s=>'<article class="person-row">'+personInfo(s)+
-    '<div class="person-date"><span aria-hidden="true">▦</span><div><strong>'+shortDate(s.next_birthday)+'</strong><small>'+(s.greeted?'✓ Celebrated':dayLabel(s.days_until))+'</small></div></div>'+
-    '<button class="person-action" data-message="'+escapeHtml(s.id)+'">✉ &nbsp; Send Message</button></article>').join('');
+  const today=new Date();
+  $('birthdayList').innerHTML=list.map(s=>{
+    const inMonth=state.filter==='month';
+    const calendarSelected=state.filter==='calendar';
+    const displayDate=(inMonth||calendarSelected)
+      ? String(s.birth_day).padStart(2,'0')+' '+months[s.birth_month-1]
+      : shortDate(s.next_birthday);
+    const monthNote=inMonth
+      ? (s.birth_day===today.getUTCDate()?'Today':s.birth_day<today.getUTCDate()?'Earlier this month':'Later this month')
+      : calendarSelected?'Birthday on this date':s.greeted?'✓ Celebrated':dayLabel(s.days_until);
+    return '<article class="person-row">'+personInfo(s)+
+      '<div class="person-date"><span aria-hidden="true">▦</span><div><strong>'+displayDate+'</strong><small>'+monthNote+'</small></div></div>'+
+      '<button class="person-action" data-message="'+escapeHtml(s.id)+'">✉ &nbsp; Send Message</button></article>';
+  }).join('');
 }
 function renderCalendar(){
   const view=state.calendar,y=view.getUTCFullYear(),m=view.getUTCMonth();
