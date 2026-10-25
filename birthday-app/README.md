@@ -38,6 +38,18 @@ The **Export pending birthdays** button exports the seven standard staff columns
 
 These fields only appear in the pending-birthdays report. The standard staff export and the import template remain seven columns. The report respects the configured reminder window and excludes birthdays already marked celebrated.
 
+## Supported upload and download formats
+
+The **Import file** action accepts **.xls, .xlsx, .csv, and .pdf** files, maximum 5 MB and 2,000 staff records per upload. The file must contain `Staff ID`, `Name`, and `Birthday` columns and may include `Number`, `Department`, `Job Title`, and `Email`. Re-importing by Staff ID updates that staff record while retaining inactive/celebration privacy preferences. Uploaded phone numbers are handled as strings to retain Ghanaian leading zeroes and international `+233` prefixes.
+
+PDF imports require selectable text in a readable table; scans and images are not processed by OCR. For the most reliable bulk upload, use XLSX or CSV. Errors are shown per invalid row.
+
+Both **Export Pending Birthdays** and **Export All Staff** allow **XLS, XLSX, CSV and PDF**. The pending report includes `Upcoming Birthday Date` and `Birthday Reminder` (e.g. `Today`, `Tomorrow`, `In 3 days`). The seven-column standard template remains XLSX.
+
+## Mobile, tablet and browser branding
+
+The layout supports phones, tablets and desktop screens. On narrower screens, the side navigation opens as an accessible drawer and the staff/admin/history tables become labeled information cards rather than unreadable wide tables. The application ships with a custom Revolt favicon and web-app manifest for browser tabs and home screens, and contains no external chat links or chat widgets.
+
 ## Security notes
 
-This is an admin-managed standalone service, not automatically connected to Revolt OS staff authentication. Do not make it publicly editable. Use a strong secret, enable Render managed HTTPS, and ensure your staffing and data privacy policies permit birthday information to be stored. Email sending is not configured; sharing birthday wishes opens the administrator's email client. In-app notifications are generated from stored staff records. The initial empty state is intentional; no sample employees are inserted.
+This is an admin-managed standalone service, not automatically connected to Revolt OS staff authentication. Do not make it publicly editable. Use a strong secret, enable Render managed HTTPS, and ensure your staffing and data privacy policies permit birthday information to be stored. Email sending is not configured; sharing birthday wishes opens the administrator's email client. In-app notifications are generated from stored staff records. Only administrator-managed data is shown. Sample employees already seeded in Neon have DEMO-prefixed Staff IDs and should be replaced with authorised real records before production use.
