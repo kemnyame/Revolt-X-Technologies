@@ -338,3 +338,8 @@ h2{letter-spacing:-.5px}
  .credential-password-row{align-items:stretch;flex-direction:column;}
  .credential-password-row button{width:100%;}
 }
+
+/* Simplified seven-field staff entry */
+.form-grid .form-full-width{grid-column:1/-1}
+.directory-table .person-info h3{font-size:12px}
+@media(max-width:620px){.form-grid .form-full-width{grid-column:auto}}
