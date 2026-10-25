@@ -203,8 +203,12 @@ async function sendBook(res,wb,name){
   await wb.xlsx.write(res);res.end();
 }
 app.get('/api/template',async(req,res,next)=>{
-  try{const {wb,ws}=newWorkbook();ws.addRow(['STF-000001','Ama','Mensah',24,10,'','Operations','Officer','ama@example.com','active','No']);
-    ws.getRow(2).font={italic:true,color:{argb:'FF63738A'}};await sendBook(res,wb,'revolt_birthday_import_template.xlsx');}
+  try{const {wb}=newWorkbook();
+    const help=wb.addWorksheet('Instructions');
+    help.columns=[{width:28},{width:88}];
+    help.addRows([['Field','Instructions'],['Staff ID','Required. Unique staff ID. Rows with an existing Staff ID update the existing record.'],['First Name / Last Name','Required for every employee.'],['Birth Day / Birth Month','Required as numbers (1–31 and 1–12). 29 February is accepted.'],['Birth Year','Optional, leave blank if not required by company policy.'],['Employment Status','active or inactive. Default is active.'],['Hide From Celebrations','Yes if an employee should not appear on birthday calendars or pending exports.'],['Important','Enter real staff records only on the Staff Birthdays worksheet. The template is intentionally blank.']]);
+    help.getRow(1).font={bold:true};
+    await sendBook(res,wb,'revolt_birthday_import_template.xlsx');}
   catch(e){next(e);}
 });
 app.get('/api/export',async(req,res,next)=>{
@@ -222,8 +226,6 @@ app.get('/api/export',async(req,res,next)=>{
        scope==='upcoming' ? x.days_until<=30 :
        x.days_until<=days&&!x.greeted)));
     const {wb,ws}=newWorkbook();
-    ws.addRow(HEADERS.map(()=>''));ws.spliceRows(2,1);
-    ws.addRow([]);ws.spliceRows(2,1);
     for(const s of filtered){
       ws.addRow([s.staff_code,s.first_name,s.last_name,s.birth_day,s.birth_month,s.birth_year??'',s.department,s.job_title,s.email,s.employment_status,s.hide_from_celebrations?'Yes':'No']);
     }
@@ -273,8 +275,16 @@ app.post('/api/import',upload.single('file'),async(req,res,next)=>{
             hide_from_celebrations:get(row,'hidefromcelebrations').toLowerCase()==='yes'
           });
           const q='INSERT INTO birthday_staff('+cols+') VALUES('+values(s).map((_,j)=>'$'+(j+1)).join(',')+') ON CONFLICT(staff_code) DO UPDATE SET first_name=excluded.first_name,last_name=excluded.last_name,birth_day=excluded.birth_day,birth_month=excluded.birth_month,birth_year=excluded.birth_year,department=excluded.department,job_title=excluded.job_title,email=excluded.email,employment_status=excluded.employment_status,hide_from_celebrations=excluded.hide_from_celebrations,updated_at=now() RETURNING (xmax = 0) AS inserted';
-          const outcome=await client.query(q,values(s));
-          if(outcome.rows[0].inserted)inserted++;else updated++;
+          await client.query('SAVEPOINT staff_import_row');
+          try {
+            const outcome=await client.query(q,values(s));
+            if(outcome.rows[0].inserted)inserted++;else updated++;
+            await client.query('RELEASE SAVEPOINT staff_import_row');
+          } catch(queryError) {
+            await client.query('ROLLBACK TO SAVEPOINT staff_import_row');
+            await client.query('RELEASE SAVEPOINT staff_import_row');
+            throw queryError;
+          }
         }catch(e){
           skipped++;if(errors.length<100)errors.push({row:i,reason:e.message||'Invalid row'});
         }
