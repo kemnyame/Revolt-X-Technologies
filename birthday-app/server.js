@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { isValidBirthday, staffWithBirthday } = require('./birthdays');
+const { parseBirthday, displayBirthday, splitName } = require('./birthday-fields');
 
 const PORT = Number(process.env.PORT || 10000);
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -193,27 +194,38 @@ app.patch('/api/admins/:id/status',async(req,res,next)=>{
 function text(value,max=120){return String(value??'').trim().slice(0,max);}
 function validateStaff(input){
   const staff_code=text(input.staff_code,32).toUpperCase();
-  const first_name=text(input.first_name,80),last_name=text(input.last_name,80);
-  const birth_day=Number(input.birth_day),birth_month=Number(input.birth_month);
-  const birth_year=input.birth_year===null||input.birth_year===undefined||String(input.birth_year).trim()===''?null:Number(input.birth_year);
+  const hasSimpleFields=Object.hasOwn(input,'name')||Object.hasOwn(input,'birthday');
+  let first_name,last_name,birth_day,birth_month,birth_year;
+  if(hasSimpleFields){
+    ({first_name,last_name}=splitName(input.name));
+    ({birth_day,birth_month,birth_year}=parseBirthday(input.birthday));
+  }else{
+    first_name=text(input.first_name,80);last_name=text(input.last_name,80);
+    birth_day=Number(input.birth_day);birth_month=Number(input.birth_month);
+    birth_year=input.birth_year===null||input.birth_year===undefined||String(input.birth_year).trim()===''?null:Number(input.birth_year);
+  }
+  const phone_number=text(input.number??input.phone_number,40);
   const email=text(input.email,200).toLowerCase();
   const avatar_url=text(input.avatar_url,500);
   const employment_status=text(input.employment_status||'active',20).toLowerCase();
   const hide_from_celebrations=[true,'true','yes','1',1].includes(input.hide_from_celebrations);
-  if(!/^[A-Z0-9][A-Z0-9._/-]{1,31}$/.test(staff_code))throw Error('Staff ID must be 2–32 letters, numbers, dots, underscores, slashes or hyphens.');
-  if(!first_name||!last_name)throw Error('First name and last name are required.');
-  if(!isValidBirthday(birth_month,birth_day))throw Error('Enter a valid birth month and day.');
-  if(birth_year!==null&&(!Number.isInteger(birth_year)||birth_year<1900||birth_year>new Date().getUTCFullYear()))throw Error('Birth year must be valid or blank.');
+  if(!/^[A-Z0-9][A-Z0-9._/-]{1,31}$/.test(staff_code))
+    throw Error('Staff ID must be 2–32 letters, numbers, dots, underscores, slashes or hyphens.');
+  if(!first_name)throw Error('Name is required.');
+  if(!isValidBirthday(birth_month,birth_day))throw Error('Birthday is not a valid calendar date.');
+  if(birth_year!==null&&(!Number.isInteger(birth_year)||birth_year<1900||birth_year>new Date().getUTCFullYear()))
+    throw Error('Birthday year is not valid.');
+  if(phone_number&&!/^\+?[\d\s().-]{5,35}$/.test(phone_number))throw Error('Number must be a valid phone number.');
   if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw Error('Enter a valid email address.');
   if(avatar_url&&!/^https:\/\/[^\s]+$/i.test(avatar_url))throw Error('Photo URL must start with https://');
   if(!['active','inactive'].includes(employment_status))throw Error('Status must be active or inactive.');
-  return {staff_code,first_name,last_name,birth_day,birth_month,birth_year,email,avatar_url,employment_status,hide_from_celebrations,
+  return {staff_code,first_name,last_name,birth_day,birth_month,birth_year,phone_number,email,avatar_url,employment_status,hide_from_celebrations,
     department:text(input.department,100),job_title:text(input.job_title,120)};
 }
-const cols='staff_code,first_name,last_name,birth_day,birth_month,birth_year,department,job_title,email,avatar_url,employment_status,hide_from_celebrations';
-function values(s){return [s.staff_code,s.first_name,s.last_name,s.birth_day,s.birth_month,s.birth_year,s.department,s.job_title,s.email,s.avatar_url,s.employment_status,s.hide_from_celebrations];}
+const cols='staff_code,first_name,last_name,birth_day,birth_month,birth_year,department,job_title,email,avatar_url,employment_status,hide_from_celebrations,phone_number';
+function values(s){return [s.staff_code,s.first_name,s.last_name,s.birth_day,s.birth_month,s.birth_year,s.department,s.job_title,s.email,s.avatar_url,s.employment_status,s.hide_from_celebrations,s.phone_number];}
 async function saveStaff(s,id){
-  if(id)return db.query('UPDATE birthday_staff SET staff_code=$1,first_name=$2,last_name=$3,birth_day=$4,birth_month=$5,birth_year=$6,department=$7,job_title=$8,email=$9,avatar_url=$10,employment_status=$11,hide_from_celebrations=$12,updated_at=now() WHERE id=$13 RETURNING *',[...values(s),id]);
+  if(id)return db.query('UPDATE birthday_staff SET staff_code=$1,first_name=$2,last_name=$3,birth_day=$4,birth_month=$5,birth_year=$6,department=$7,job_title=$8,email=$9,avatar_url=$10,employment_status=$11,hide_from_celebrations=$12,phone_number=$13,updated_at=now() WHERE id=$14 RETURNING *',[...values(s),id]);
   return db.query('INSERT INTO birthday_staff('+cols+') VALUES('+values(s).map((_,i)=>'$'+(i+1)).join(',')+') RETURNING *',values(s));
 }
 app.get('/api/overview',async(req,res,next)=>{
@@ -234,11 +246,11 @@ app.get('/api/overview',async(req,res,next)=>{
 });
 app.post('/api/staff',async(req,res,next)=>{
   try{const s=validateStaff(req.body||{});const r=await saveStaff(s);res.status(201).json(r.rows[0]);}
-  catch(e){if(e.code==='23505')return fail(res,409,'That Staff ID already exists.'); if(e.message?.startsWith('Enter ')||/^(Staff ID|First name|Birth year|Status|Photo)/.test(e.message))return fail(res,400,e.message);next(e);}
+  catch(e){if(e.code==='23505')return fail(res,409,'That Staff ID already exists.'); if(e.message?.startsWith('Enter ')||/^(Staff ID|Name |Birthday |Number |First name|Birth year|Status|Photo|Use DD)/.test(e.message))return fail(res,400,e.message);next(e);}
 });
 app.put('/api/staff/:id',async(req,res,next)=>{
   try{const s=validateStaff(req.body||{});const r=await saveStaff(s,req.params.id);if(!r.rowCount)return fail(res,404,'Staff record not found.');res.json(r.rows[0]);}
-  catch(e){if(e.code==='23505')return fail(res,409,'That Staff ID already exists.');if(e.code==='22P02')return fail(res,400,'Invalid staff record.');if(e.message?.startsWith('Enter ')||/^(Staff ID|First name|Birth year|Status|Photo)/.test(e.message))return fail(res,400,e.message);next(e);}
+  catch(e){if(e.code==='23505')return fail(res,409,'That Staff ID already exists.');if(e.code==='22P02')return fail(res,400,'Invalid staff record.');if(e.message?.startsWith('Enter ')||/^(Staff ID|Name |Birthday |Number |First name|Birth year|Status|Photo|Use DD)/.test(e.message))return fail(res,400,e.message);next(e);}
 });
 app.delete('/api/staff/:id',async(req,res,next)=>{
   try{const r=await db.query("UPDATE birthday_staff SET employment_status='inactive',updated_at=now() WHERE id=$1 RETURNING id",[req.params.id]);if(!r.rowCount)return fail(res,404,'Staff record not found.');res.json({ok:true});}
@@ -268,15 +280,16 @@ app.put('/api/settings',async(req,res,next)=>{
     res.json({reminder_days:reminder});
   }catch(e){next(e);}
 });
-const HEADERS=['Staff ID','First Name','Last Name','Birth Day','Birth Month','Birth Year','Department','Job Title','Email','Employment Status','Hide From Celebrations'];
+const HEADERS=['Staff ID','Name','Number','Birthday','Department','Job Title','Email'];
 function newWorkbook(){
-  const wb=new ExcelJS.Workbook();wb.creator='Revolt Staff Birthdays';
+  const wb=new ExcelJS.Workbook();wb.creator='Revolt - Technologies Birthday Management';
   const ws=wb.addWorksheet('Staff Birthdays',{views:[{state:'frozen',ySplit:1}]});
   ws.addRow(HEADERS);
   ws.getRow(1).font={bold:true,color:{argb:'FFFFFFFF'}};
   ws.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE90032'}};
-  ws.columns=HEADERS.map((_,i)=>({width:[20,23,23,13,16,15,25,26,30,20,28][i]}));
-  ws.autoFilter={from:'A1',to:'K1'};
+  ws.columns=HEADERS.map((_,i)=>({width:[22,30,24,23,26,30,38][i]}));
+  ws.getColumn(1).numFmt='@';ws.getColumn(3).numFmt='@';ws.getColumn(4).numFmt='@';
+  ws.autoFilter={from:'A1',to:'G1'};
   return {wb,ws};
 }
 async function sendBook(res,wb,name){
@@ -285,13 +298,24 @@ async function sendBook(res,wb,name){
   await wb.xlsx.write(res);res.end();
 }
 app.get('/api/template',async(req,res,next)=>{
-  try{const {wb}=newWorkbook();
+  try{
+    const {wb}=newWorkbook();
     const help=wb.addWorksheet('Instructions');
-    help.columns=[{width:28},{width:88}];
-    help.addRows([['Field','Instructions'],['Staff ID','Required. Unique staff ID. Rows with an existing Staff ID update the existing record.'],['First Name / Last Name','Required for every employee.'],['Birth Day / Birth Month','Required as numbers (1–31 and 1–12). 29 February is accepted.'],['Birth Year','Optional, leave blank if not required by company policy.'],['Employment Status','active or inactive. Default is active.'],['Hide From Celebrations','Yes if an employee should not appear on birthday calendars or pending exports.'],['Important','Enter real staff records only on the Staff Birthdays worksheet. The template is intentionally blank.']]);
+    help.columns=[{width:25},{width:95}];
+    help.addRows([
+      ['Column','How to fill it in'],
+      ['Staff ID','Required and unique (e.g., STF-001). Used to update existing staff safely.'],
+      ['Name','Full name in one cell (e.g., Akosua Mensah).'],
+      ['Number','Contact telephone number; keep leading zeros by entering as text.'],
+      ['Birthday','DD/MM/YYYY (e.g., 25/10/1990), DD/MM (if year unknown), or an actual Excel date.'],
+      ['Department','Department name (e.g., Finance).'],
+      ['Job Title','Position or role (e.g., Officer).'],
+      ['Email','Work email address.'],
+      ['Import','Use only the first worksheet for records. It is intentionally blank, with seven columns.']
+    ]);
     help.getRow(1).font={bold:true};
-    await sendBook(res,wb,'revolt_birthday_import_template.xlsx');}
-  catch(e){next(e);}
+    await sendBook(res,wb,'revolt_birthday_import_template.xlsx');
+  }catch(e){next(e);}
 });
 app.get('/api/export',async(req,res,next)=>{
   try{
@@ -309,11 +333,9 @@ app.get('/api/export',async(req,res,next)=>{
        x.days_until<=days&&!x.greeted)));
     const {wb,ws}=newWorkbook();
     for(const s of filtered){
-      ws.addRow([s.staff_code,s.first_name,s.last_name,s.birth_day,s.birth_month,s.birth_year??'',s.department,s.job_title,s.email,s.employment_status,s.hide_from_celebrations?'Yes':'No']);
+      ws.addRow([s.staff_code,[s.first_name,s.last_name].filter(Boolean).join(' '),s.phone_number||'',
+        displayBirthday(s),s.department,s.job_title,s.email]);
     }
-    ws.getColumn(12).width=18;ws.getColumn(13).width=16;
-    ws.getCell('L1').value='Next Birthday';ws.getCell('M1').value='Days Until';
-    filtered.forEach((s,i)=>{ws.getCell(i+2,12).value=s.next_birthday;ws.getCell(i+2,13).value=s.days_until;});
     await sendBook(res,wb,'revolt_birthdays_'+scope+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
   }catch(e){next(e);}
 });
@@ -337,8 +359,10 @@ app.post('/api/import',upload.single('file'),async(req,res,next)=>{
     const normalize=v=>String(v).toLowerCase().replace(/[^a-z0-9]/g,'');
     const headers={};
     ws.getRow(1).eachCell((cell,col)=>{headers[normalize(cellString(cell))]=col;});
-    for(const key of ['staffid','firstname','lastname','birthday','birthmonth']){
-      if(!headers[key])return fail(res,400,'Missing spreadsheet column: '+key+'. Download the template to see the required columns.');
+    if(!headers.number&&headers.phonenumber)headers.number=headers.phonenumber;
+    if(!headers.number&&headers.contactnumber)headers.number=headers.contactnumber;
+    for(const key of ['staffid','name','birthday']){
+      if(!headers[key])return fail(res,400,'Missing column: '+key+'. Use the seven-column Excel template.');
     }
     const get=(row,key)=>headers[key]?cellString(row.getCell(headers[key])):'';
     const client=await db.connect();
@@ -349,20 +373,26 @@ app.post('/api/import',upload.single('file'),async(req,res,next)=>{
         const row=ws.getRow(i);
         if(!row.hasValues)continue;
         try{
+          const rawBirthday=headers.birthday?row.getCell(headers.birthday).value:null;
+          const birthday=rawBirthday&&typeof rawBirthday==='object'&&!(rawBirthday instanceof Date)
+            ? (rawBirthday.result??rawBirthday.text??get(row,'birthday')):rawBirthday;
           const s=validateStaff({
-            staff_code:get(row,'staffid'),first_name:get(row,'firstname'),last_name:get(row,'lastname'),
-            birth_day:get(row,'birthday'),birth_month:get(row,'birthmonth'),birth_year:get(row,'birthyear'),
-            department:get(row,'department'),job_title:get(row,'jobtitle'),email:get(row,'email'),
-            employment_status:get(row,'employmentstatus')||'active',
-            hide_from_celebrations:get(row,'hidefromcelebrations').toLowerCase()==='yes'
+            staff_code:get(row,'staffid'),name:get(row,'name'),number:get(row,'number'),
+            birthday,department:get(row,'department'),job_title:get(row,'jobtitle'),email:get(row,'email')
           });
-          const q='INSERT INTO birthday_staff('+cols+') VALUES('+values(s).map((_,j)=>'$'+(j+1)).join(',')+') ON CONFLICT(staff_code) DO UPDATE SET first_name=excluded.first_name,last_name=excluded.last_name,birth_day=excluded.birth_day,birth_month=excluded.birth_month,birth_year=excluded.birth_year,department=excluded.department,job_title=excluded.job_title,email=excluded.email,employment_status=excluded.employment_status,hide_from_celebrations=excluded.hide_from_celebrations,updated_at=now() RETURNING (xmax = 0) AS inserted';
+          // Existing staff keep inactive/privacy settings and photos when re-imported.
+          const args=[s.staff_code,s.first_name,s.last_name,s.phone_number,s.birth_day,s.birth_month,
+            s.birth_year,s.department,s.job_title,s.email];
+          const q='INSERT INTO birthday_staff(staff_code,first_name,last_name,phone_number,birth_day,birth_month,birth_year,department,job_title,email) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) '+
+            'ON CONFLICT(staff_code) DO UPDATE SET first_name=excluded.first_name,last_name=excluded.last_name,phone_number=excluded.phone_number,'+
+            'birth_day=excluded.birth_day,birth_month=excluded.birth_month,birth_year=excluded.birth_year,'+
+            'department=excluded.department,job_title=excluded.job_title,email=excluded.email,updated_at=now() RETURNING (xmax = 0) AS inserted';
           await client.query('SAVEPOINT staff_import_row');
-          try {
-            const outcome=await client.query(q,values(s));
+          try{
+            const outcome=await client.query(q,args);
             if(outcome.rows[0].inserted)inserted++;else updated++;
             await client.query('RELEASE SAVEPOINT staff_import_row');
-          } catch(queryError) {
+          }catch(queryError){
             await client.query('ROLLBACK TO SAVEPOINT staff_import_row');
             await client.query('RELEASE SAVEPOINT staff_import_row');
             throw queryError;
