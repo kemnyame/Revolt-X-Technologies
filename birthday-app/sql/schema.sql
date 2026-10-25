@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS birthday_staff (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   staff_code text NOT NULL UNIQUE,
   first_name text NOT NULL,
+  phone_number text NOT NULL DEFAULT '',
   last_name text NOT NULL,
   birth_day smallint NOT NULL CHECK (birth_day BETWEEN 1 AND 31),
   birth_month smallint NOT NULL CHECK (birth_month BETWEEN 1 AND 12),
@@ -62,3 +63,5 @@ CREATE TABLE IF NOT EXISTS birthday_settings (
   value text NOT NULL
 );
 INSERT INTO birthday_settings(key,value) VALUES ('reminder_days','30') ON CONFLICT (key) DO NOTHING;
+-- Upgrade existing installations without altering saved staff records.
+ALTER TABLE birthday_staff ADD COLUMN IF NOT EXISTS phone_number text NOT NULL DEFAULT '';
