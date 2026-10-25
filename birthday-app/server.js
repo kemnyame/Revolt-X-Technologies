@@ -51,7 +51,7 @@ async function requireAdmin(req,res,next){
     const token=cookieValue(req,'revolt_birthday_session');
     if(!token || !/^[a-f0-9]{64}$/.test(token)) return fail(res,401,'Please sign in to continue.');
     const {rows}=await db.query(
-      'SELECT a.id,a.email FROM birthday_sessions s JOIN birthday_admins a ON a.id=s.admin_id WHERE s.token_hash=$1 AND s.expires_at>now()',
+      'SELECT a.id,a.email,a.full_name,a.must_change_password FROM birthday_sessions s JOIN birthday_admins a ON a.id=s.admin_id WHERE s.token_hash=$1 AND s.expires_at>now() AND a.is_active=true',
       [tokenDigest(token)]);
     if(!rows.length)return fail(res,401,'Your session has expired. Please sign in again.');
     req.admin=rows[0];req.token=token;next();
@@ -76,7 +76,7 @@ app.post('/api/login', async(req,res,next)=>{
     const email=String(req.body?.email||'').trim().toLowerCase();
     const password=String(req.body?.password||'');
     if(!email || !password)return fail(res,400,'Enter your email address and password.');
-    const result=await db.query('SELECT id,email,password_hash FROM birthday_admins WHERE email=$1',[email]);
+    const result=await db.query('SELECT id,email,password_hash,must_change_password,full_name FROM birthday_admins WHERE email=$1 AND is_active=true',[email]);
     const admin=result.rows[0];
     if(!admin || !verifyPassword(password,admin.password_hash)){
       counter.attempts++;limits.set(ip,counter);
@@ -84,10 +84,11 @@ app.post('/api/login', async(req,res,next)=>{
       return fail(res,401,'Incorrect email or password.');
     }
     limits.delete(ip);
+    await db.query('UPDATE birthday_admins SET last_login_at=now() WHERE id=$1',[admin.id]);
     const token=crypto.randomBytes(32).toString('hex');
     await db.query('INSERT INTO birthday_sessions(token_hash,admin_id,expires_at) VALUES($1,$2,now()+interval \'12 hours\')',[tokenDigest(token),admin.id]);
     setCookie(res,token,12*3600000);
-    res.json({email:admin.email});
+    res.json({email:admin.email,full_name:admin.full_name,must_change_password:admin.must_change_password});
   }catch(e){next(e);}
 });
 app.post('/api/logout',requireAdmin,async(req,res,next)=>{
@@ -96,16 +97,96 @@ app.post('/api/logout',requireAdmin,async(req,res,next)=>{
 });
 app.get('/health',async(req,res)=>{try{await db.query('SELECT 1');res.json({status:'ok'});}catch{res.status(503).json({status:'db_unavailable'});}});
 app.use('/api',requireAdmin);
-app.get('/api/me',(req,res)=>res.json({email:req.admin.email}));
+app.use('/api',(req,res,next)=>{
+  // This guard applies to all protected APIs, including exports and staff data.
+  // A newly created or reset administrator can only change their password or sign out.
+  if(req.admin.must_change_password && !['/api/me','/api/account/password','/api/logout'].includes(req.path)){
+    return res.status(403).json({error:'Change your temporary password to continue.',password_change_required:true});
+  }
+  next();
+});
+app.get('/api/me',(req,res)=>res.json({email:req.admin.email,full_name:req.admin.full_name,must_change_password:req.admin.must_change_password}));
 app.post('/api/account/password',async(req,res,next)=>{
   try{
     const current=String(req.body?.current||''),nextPassword=String(req.body?.next||'');
-    if(nextPassword.length<12 || nextPassword.length>256)return fail(res,400,'New password must be at least 12 characters.');
+    if(nextPassword.length<12 || nextPassword.length>256)return fail(res,400,'New password must be between 12 and 256 characters.');
+    if(nextPassword===current)return fail(res,400,'Choose a different password from your current password.');
     const info=await db.query('SELECT password_hash FROM birthday_admins WHERE id=$1',[req.admin.id]);
     if(!info.rows.length||!verifyPassword(current,info.rows[0].password_hash))return fail(res,403,'Current password is incorrect.');
-    await db.query('UPDATE birthday_admins SET password_hash=$1,updated_at=now() WHERE id=$2',[passwordHash(nextPassword),req.admin.id]);
+    await db.query('UPDATE birthday_admins SET password_hash=$1,must_change_password=false,updated_at=now() WHERE id=$2',[passwordHash(nextPassword),req.admin.id]);
     await db.query('DELETE FROM birthday_sessions WHERE admin_id=$1 AND token_hash<>$2',[req.admin.id,tokenDigest(req.token)]);
     res.json({ok:true});
+  }catch(e){next(e);}
+});
+function newTemporaryPassword(){
+  // Random, one-time password: never persisted, logged or emailed in plain text.
+  return 'RBM-'+crypto.randomBytes(21).toString('base64url');
+}
+app.get('/api/admins',async(req,res,next)=>{
+  try{
+    const r=await db.query('SELECT id,email,full_name,is_active,must_change_password,created_at,last_login_at FROM birthday_admins ORDER BY created_at ASC LIMIT 250');
+    res.json({admins:r.rows,current_admin_id:req.admin.id});
+  }catch(e){next(e);}
+});
+app.post('/api/admins',async(req,res,next)=>{
+  try{
+    const email=String(req.body?.email||'').trim().toLowerCase();
+    const fullName=String(req.body?.full_name||'').trim();
+    if(email.length>200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      return fail(res,400,'Enter a valid administrator email address.');
+    if(fullName.length<2 || fullName.length>120)
+      return fail(res,400,'Enter the administrator’s full name (2–120 characters).');
+    const temporary_password=newTemporaryPassword();
+    const created=await db.query(
+      'INSERT INTO birthday_admins(email,full_name,password_hash,must_change_password,is_active,created_by) VALUES($1,$2,$3,true,true,$4) RETURNING id,email,full_name,created_at',
+      [email,fullName,passwordHash(temporary_password),req.admin.id]
+    );
+    res.status(201).json({admin:created.rows[0],temporary_password,must_change_password:true});
+  }catch(e){
+    if(e.code==='23505')return fail(res,409,'An administrator with this email already exists.');
+    next(e);
+  }
+});
+app.post('/api/admins/:id/reset-password',async(req,res,next)=>{
+  try{
+    if(!/^[0-9a-f-]{36}$/i.test(req.params.id))return fail(res,400,'Invalid administrator ID.');
+    if(req.params.id===req.admin.id)return fail(res,400,'Change your own password from Settings.');
+    const temporary_password=newTemporaryPassword();
+    const client=await db.connect();
+    let admin;
+    try{
+      await client.query('BEGIN');
+      const result=await client.query(
+        'UPDATE birthday_admins SET password_hash=$1,must_change_password=true,updated_at=now() WHERE id=$2 AND is_active=true RETURNING id,email,full_name',
+        [passwordHash(temporary_password),req.params.id]
+      );
+      admin=result.rows[0];
+      if(admin)await client.query('DELETE FROM birthday_sessions WHERE admin_id=$1',[admin.id]);
+      await client.query('COMMIT');
+    }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+    if(!admin)return fail(res,404,'Active administrator not found.');
+    res.json({admin,temporary_password,must_change_password:true});
+  }catch(e){next(e);}
+});
+app.patch('/api/admins/:id/status',async(req,res,next)=>{
+  try{
+    if(!/^[0-9a-f-]{36}$/i.test(req.params.id))return fail(res,400,'Invalid administrator ID.');
+    if(typeof req.body?.is_active!=='boolean')return fail(res,400,'Choose active or suspended.');
+    if(req.params.id===req.admin.id)return fail(res,400,'You cannot suspend your own account.');
+    const client=await db.connect();
+    let result;
+    try{
+      await client.query('BEGIN');
+      result=await client.query(
+        'UPDATE birthday_admins SET is_active=$1,updated_at=now() WHERE id=$2 RETURNING id,email,is_active',
+        [req.body.is_active,req.params.id]
+      );
+      if(result.rowCount && !req.body.is_active)
+        await client.query('DELETE FROM birthday_sessions WHERE admin_id=$1',[req.params.id]);
+      await client.query('COMMIT');
+    }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+    if(!result.rowCount)return fail(res,404,'Administrator not found.');
+    res.json({admin:result.rows[0]});
   }catch(e){next(e);}
 });
 function text(value,max=120){return String(value??'').trim().slice(0,max);}
