@@ -21,9 +21,63 @@
   reducedMotion.addEventListener('change',event=>{if(event.matches){$$('.reveal').forEach(element=>element.classList.remove('waiting'));observer.disconnect()}});
  }
 
- const tabs=$$('[data-tab]');
- function selectTab(button){$$('[data-platform-visual]').forEach(visual=>{visual.hidden=visual.dataset.platformVisual!==button.dataset.tab});tabs.forEach(tab=>{const selected=tab===button;tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;const panel=$('#'+tab.dataset.tab);panel.hidden=!selected;if(selected&&!reducedMotion.matches)panel.animate([{opacity:.2,transform:'translateY(8px)'},{opacity:1,transform:'translateY(0)'}],{duration:250,easing:'ease-out'})})}
- tabs.forEach((tab,index)=>{tab.addEventListener('click',()=>selectTab(tab));tab.addEventListener('keydown',event=>{let next;if(event.key==='ArrowRight')next=(index+1)%tabs.length;else if(event.key==='ArrowLeft')next=(index+tabs.length-1)%tabs.length;else if(event.key==='Home')next=0;else if(event.key==='End')next=tabs.length-1;else return;event.preventDefault();selectTab(tabs[next]);tabs[next].focus()})});
+ // Each tab list owns its panels, including keyboard navigation on small screens.
+ $$('[role=tablist]').forEach(list=>{
+  const tabs=$$('[data-tab]',list);
+  function selectTab(button){
+   tabs.forEach(tab=>{
+    const selected=tab===button,panel=$('#'+tab.dataset.tab);
+    tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;
+    if(!panel)return;panel.hidden=!selected;
+    if(selected&&!reducedMotion.matches)panel.animate?.([{opacity:.75,transform:'translateY(8px)'},{opacity:1,transform:'translateY(0)'}],{duration:280,easing:'cubic-bezier(.2,.7,.3,1)'});
+   });
+  }
+  tabs.forEach((tab,index)=>{
+   tab.addEventListener('click',()=>selectTab(tab));
+   tab.addEventListener('keydown',event=>{
+    let next;
+    if(event.key==='ArrowRight'||event.key==='ArrowDown')next=(index+1)%tabs.length;
+    else if(event.key==='ArrowLeft'||event.key==='ArrowUp')next=(index+tabs.length-1)%tabs.length;
+    else if(event.key==='Home')next=0;
+    else if(event.key==='End')next=tabs.length-1;
+    else return;
+    event.preventDefault();selectTab(tabs[next]);tabs[next].focus();
+   });
+  });
+ });
+
+ // Scroll progress and section navigation follow the reader, without changing history.
+ const sectionLinks=$$('.section-links a'),readingProgress=$('.reading-progress');
+ if(sectionLinks.length){
+  const sections=sectionLinks.map(link=>({link,section:$(link.getAttribute('href'))})).filter(item=>item.section);
+  let scheduled=false;
+  function updateReadingPosition(){
+   scheduled=false;
+   const styles=getComputedStyle(document.documentElement),offset=parseFloat(styles.getPropertyValue('--header-height'))+parseFloat(styles.getPropertyValue('--section-height'))+30;
+   const current=sections.filter(item=>item.section.getBoundingClientRect().top<=offset).at(-1)||sections[0];
+   sections.forEach(item=>{if(item===current)item.link.setAttribute('aria-current','location');else item.link.removeAttribute('aria-current')});
+   const distance=document.documentElement.scrollHeight-window.innerHeight;
+   if(readingProgress)readingProgress.style.transform='scaleX('+Math.min(1,Math.max(0,distance>0?window.scrollY/distance:0))+')';
+  }
+  function schedulePosition(){if(!scheduled){scheduled=true;requestAnimationFrame(updateReadingPosition)}}
+  window.addEventListener('scroll',schedulePosition,{passive:true});window.addEventListener('resize',schedulePosition);updateReadingPosition();
+ }
+
+ // Business examples are manually advanced. Native scrolling remains available.
+ const track=$('#examplesTrack'),previous=$('[data-carousel-prev]'),next=$('[data-carousel-next]'),position=$('#examplePosition');
+ if(track&&previous&&next){
+  const items=$$('.example-card',track);
+  const step=()=>items[0].getBoundingClientRect().width+parseFloat(getComputedStyle(track).columnGap||0);
+  function updateExamples(){
+   const width=step(),first=Math.min(items.length-1,Math.max(0,Math.round(track.scrollLeft/width))),visible=Math.max(1,Math.round((track.clientWidth+parseFloat(getComputedStyle(track).columnGap||0))/width));
+   previous.disabled=track.scrollLeft<2;next.disabled=track.scrollLeft>=track.scrollWidth-track.clientWidth-3;
+   const label=(first+1)+(visible>1?'–'+Math.min(items.length,first+visible):'')+' / '+items.length;
+   if(position&&position.textContent!==label)position.textContent=label;
+  }
+  const advance=direction=>track.scrollBy({left:direction*step(),behavior:reducedMotion.matches?'instant':'smooth'});
+  previous.addEventListener('click',()=>advance(-1));next.addEventListener('click',()=>advance(1));
+  track.addEventListener('scroll',updateExamples,{passive:true});window.addEventListener('resize',updateExamples);updateExamples();
+ }
 
  const search=$('#solutionSearch'),filters=$$('[data-filter]'),cards=$$('#solutionsGrid [data-category]');
  let selectedCategory='all';
