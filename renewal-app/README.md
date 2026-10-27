@@ -20,7 +20,7 @@ The API key is encrypted in PostgreSQL with AES-GCM using the runtime-only `EMAI
 
 ## Hosting
 
-This app is deployed from the `icdd-license-renewal-tracker` branch in the existing technologies repository, under `renewal-app`. It is isolated from the other application's default branch. The Render web service runs Next.js; a separate Render cron job checks renewals daily at 08:00 UTC even when the website is closed.
+This app is deployed from the `icdd-license-renewal-tracker` branch in the existing technologies repository, under `renewal-app`. It is isolated from the other application's default branch. The Render web service runs Next.js; a Neon Function Trigger checks renewals daily at 08:00 UTC even when the website is closed. The Render account did not have billing details for a paid cron service, so the scheduled worker runs on Neon. Its source is in the sibling renewal-worker directory.
 
 Required runtime settings are listed in `.env.example`. Set values only in Render's environment settings. PostgreSQL connections use certificate-validated TLS. Normal queries use the pooled Neon URL; Drizzle migrations use the direct URL. Never place credentials, licence data or email addresses in public source files.
 
