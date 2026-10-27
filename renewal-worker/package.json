@@ -1,0 +1,11 @@
+{
+  "name": "icdd-renewal-scheduler",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@neon/functions": "0.11.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
