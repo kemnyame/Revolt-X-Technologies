@@ -8,6 +8,13 @@
       "when": 1793089218745,
       "tag": "0000_magical_wonder_man",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793091637988,
+      "tag": "0001_pink_nuke",
+      "breakpoints": true
     }
   ]
 }
