@@ -2,21 +2,24 @@ import { InputError, validateLicense, matchKey, DEFAULT_LEAD_DAYS, parseDate, mo
 import type { License, LicenseInput, Settings } from './domain.ts';
 import { encryptSecret } from './secrets.ts';
 import type {Database,Statement} from './database.ts';
-export type Viewer={userId:string;email:string;displayName:string};
+import {canManage,requireAccess,normalizeEmail,ownerAllowed,listMembers} from './access.ts';
+import type {Viewer,Role} from './access.ts';
+export type {Viewer} from './access.ts';
 export type Row=Record<string,any>;
 export const iso=()=>new Date().toISOString();
 export const all=async(db:Database,sql:string,...values:any[])=>((await db.prepare(sql).bind(...values).all<Row>()).results||[]);
 export const one=async(db:Database,sql:string,...values:any[])=>db.prepare(sql).bind(...values).first<Row>();
 export function toLicense(r:Row):License{return {id:r.id,sn:r.sn,name:r.name,vendor:r.vendor,licenseType:r.license_type,department:r.department,purchaseDate:r.purchase_date,expiryDate:r.expiry_date,quantityPurchased:r.quantity_purchased,seatCount:r.seat_count,quantityInUse:r.quantity_in_use,status:r.status,lastPaymentDate:r.last_payment_date,lastPaymentMinor:r.last_payment_minor,notes:r.notes,createdAt:r.created_at,updatedAt:r.updated_at,archivedAt:r.archived_at}}
 export async function initialize(db:Database,viewer?:Viewer){
- await db.prepare(`INSERT INTO settings (id,owner_id,sender_name,sender_email,reply_to,recipients,lead_days,lead_months,overdue_interval,enabled,schedule_registered,updated_at) VALUES(1,?,?,?,?,?,?,2,7,0,0,?) ON CONFLICT (id) DO NOTHING`).bind(viewer?.userId||'','ICDD License Renewal Tracker','','','[]',JSON.stringify(DEFAULT_LEAD_DAYS),iso()).run();
- if(viewer){await db.prepare("UPDATE settings SET owner_id=? WHERE id=1 AND owner_id=''").bind(viewer.userId).run();const s=await one(db,'SELECT owner_id FROM settings WHERE id=1');if(s?.owner_id!==viewer.userId){const e=new InputError('This tracker is restricted to its owner.');e.status=403;throw e}}
+ await db.prepare(`INSERT INTO settings (id,owner_id,sender_name,sender_email,reply_to,recipients,lead_days,lead_months,overdue_interval,enabled,schedule_registered,updated_at) VALUES(1,?,?,?,?,?,?,2,7,0,0,?) ON CONFLICT (id) DO NOTHING`).bind(viewer?.role==='owner'?viewer.userId:'','ICDD License Renewal Tracker','','','[]',JSON.stringify(DEFAULT_LEAD_DAYS),iso()).run();
+ if(viewer?.role==='owner')await db.prepare('UPDATE settings SET owner_id=? WHERE id=1 AND owner_id<>?').bind(viewer.userId,viewer.userId).run();
 }
 export function safeSettings(r:Row):Settings&{lastTestAt:string|null}{return {senderName:r.sender_name,senderEmail:r.sender_email,replyTo:r.reply_to,recipients:JSON.parse(r.recipients),leadDays:JSON.parse(r.lead_days),leadMonths:r.lead_months??2,overdueInterval:r.overdue_interval,enabled:!!r.enabled,apiKeySet:!!r.encrypted_api_key,jobLastChecked:r.job_last_checked,jobLastResult:r.job_last_result,scheduleRegistered:!!r.schedule_registered,lastTestAt:r.last_test_at}}
 export async function getState(db:Database,viewer:Viewer){
  await initialize(db,viewer);
  const [records,renewals,activity,emails,settings]=await Promise.all([all(db,'SELECT * FROM licenses ORDER BY created_at DESC LIMIT 5000'),all(db,'SELECT r.*,l.name FROM renewals r JOIN licenses l ON l.id=r.license_id ORDER BY r.created_at DESC LIMIT 500'),all(db,'SELECT * FROM activity ORDER BY created_at DESC LIMIT 250'),all(db,'SELECT id,recipient,subject,status,provider_id,error,attempts,created_at,updated_at FROM email_log ORDER BY created_at DESC LIMIT 100'),one(db,'SELECT * FROM settings WHERE id=1')]);
- return {licenses:records.map(toLicense),renewals,activity,emails,settings:safeSettings(settings!),viewer:{displayName:viewer.displayName,email:viewer.email},today:todayUTC()};
+ const admin=canManage(viewer.role),safe=safeSettings(settings!);
+ return {licenses:records.map(toLicense),renewals,activity,emails:admin?emails:[],members:admin?await listMembers(db):[],settings:admin?safe:{...safe,senderEmail:'',replyTo:'',recipients:[],apiKeySet:false},viewer:{displayName:viewer.displayName,email:viewer.email,role:viewer.role},today:todayUTC()};
 }
 const columns=['id','sn','name','vendor','license_type','department','purchase_date','expiry_date','quantity_purchased','seat_count','quantity_in_use','status','last_payment_date','last_payment_minor','notes','match_key','created_at','updated_at','archived_at'];
 function sqlRow(v:LicenseInput,id:string,now:string,created=now,archivedAt:string|null=null):Row{return {id,sn:v.sn,name:v.name,vendor:v.vendor,license_type:v.licenseType,department:v.department,purchase_date:v.purchaseDate,expiry_date:v.expiryDate,quantity_purchased:v.quantityPurchased,seat_count:v.seatCount,quantity_in_use:v.quantityInUse,status:v.status,last_payment_date:v.lastPaymentDate,last_payment_minor:v.lastPaymentMinor,notes:v.notes,match_key:matchKey(v),created_at:created,updated_at:now,archived_at:archivedAt}}
@@ -27,6 +30,7 @@ async function commit(db:Database,requestId:string,action:string,result:unknown,
  try{await db.batch([...statements,db.prepare('INSERT INTO request_receipts(id,action,result,created_at) VALUES(?,?,?,?)').bind(requestId,action,JSON.stringify(result),iso())]);return result}catch(error){const prior=await receipt(db,requestId,action);if(prior)return prior;throw error}
 }
 export async function mutateRecords(db:Database,viewer:Viewer,body:Row){
+ requireAccess(viewer,'edit');
  const action=String(body.action||''),requestId=String(body.requestId||'');if(!/^[a-zA-Z0-9-]{16,80}$/.test(requestId))throw new InputError('A valid request identifier is required.');
  const prior=await receipt(db,requestId,action);if(prior)return prior;await initialize(db,viewer);
  if(action==='create'||action==='update'){
@@ -61,6 +65,7 @@ export async function mutateRecords(db:Database,viewer:Viewer,body:Row){
  throw new InputError('This record action is not supported.');
 }
 export async function updateSettings(db:Database,viewer:Viewer,body:Row,encryptionKey:string|undefined){
+ requireAccess(viewer,'manage');
  await initialize(db,viewer);const old=(await one(db,'SELECT * FROM settings WHERE id=1'))!;
  const senderName=String(body.senderName||'ICDD License Renewal Tracker').trim();if(senderName.length>100||/[<>\r\n]/.test(senderName))throw new InputError('Enter a short sender name without angle brackets.');
  const senderEmail=String(body.senderEmail||'').trim().toLowerCase(),replyTo=String(body.replyTo||'').trim().toLowerCase();if(senderEmail&&!emailValid(senderEmail))throw new InputError('Enter a valid sender email.');if(replyTo&&!emailValid(replyTo))throw new InputError('Enter a valid reply-to email.');
@@ -70,4 +75,31 @@ export async function updateSettings(db:Database,viewer:Viewer,body:Row,encrypti
  const changed=senderEmail!==old.sender_email||!!newKey||body.removeApiKey===true;
  await db.batch([db.prepare('UPDATE settings SET sender_name=?,sender_email=?,reply_to=?,recipients=?,lead_days=?,lead_months=?,overdue_interval=?,enabled=?,encrypted_api_key=?,last_test_at=?,updated_at=? WHERE id=1').bind(senderName,senderEmail,replyTo,JSON.stringify(recipients),JSON.stringify(leadDays),months,interval,body.enabled?1:0,encrypted,changed?null:old.last_test_at,iso()),audit(db,viewer.email,'settings','Updated email reminder settings.',{enabled:!!body.enabled,leadDays,leadMonths:months,overdueInterval:interval,recipientCount:recipients.length})]);
  return {ok:true,message:'Email settings saved.'};
+}
+
+export async function manageMember(db:Database,viewer:Viewer,body:Row){
+ requireAccess(viewer,'manage');
+ const requestId=String(body.requestId||''),action=String(body.action);
+ if(!/^[a-zA-Z0-9-]{16,80}$/.test(requestId))throw new InputError('Start a new user request.');
+ const prior=await receipt(db,requestId,action);if(prior)return prior;
+ const name=String(body.name||'').trim(),role=String(body.role) as Role,status=String(body.status||'active');
+ if(!name||name.length>100)throw new InputError('Enter a name of up to 100 characters.');
+ if(!['admin','editor','viewer'].includes(role))throw new InputError('Choose Admin, Editor or View only.');
+ if(!['active','suspended'].includes(status))throw new InputError('Choose active or suspended access.');
+ const now=iso();
+ if(action==='addUser'){
+  const email=normalizeEmail(String(body.email||''));if(!emailValid(email))throw new InputError('Enter a valid user email address.');
+  if(ownerAllowed(email))throw new InputError('This email is the workspace owner and already has access.');
+  if(await one(db,'SELECT id FROM workspace_users WHERE email=?',email))throw new InputError('This user has already been added. Choose Edit access to make changes.');
+  const count=await one(db,'SELECT COUNT(*) AS n FROM workspace_users');if(count!.n>=250)throw new InputError('This workspace supports up to 250 users.');
+  const id=crypto.randomUUID();
+  return commit(db,requestId,action,{ok:true,message:'User added. They can sign in with an email code.'},[db.prepare('INSERT INTO workspace_users(id,email,name,role,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)').bind(id,email,name,role,status,viewer.email,now,now),audit(db,viewer.email,'user_added','Added '+name+' to the workspace.',{email,role,status})]);
+ }
+ if(action==='updateUser'){
+  const old=await one(db,'SELECT * FROM workspace_users WHERE id=?',String(body.id||''));if(!old)throw new InputError('This user could not be found.');
+  if(old.role==='owner'||ownerAllowed(old.email))throw new InputError('The workspace owner cannot be changed here.');
+  if(old.email===viewer.email)throw new InputError('Ask another admin to change your own access.');
+  return commit(db,requestId,action,{ok:true,message:status==='suspended'?'User access suspended.':'User access updated.'},[db.prepare('UPDATE workspace_users SET name=?,role=?,status=?,updated_at=? WHERE id=?').bind(name,role,status,now,old.id),audit(db,viewer.email,'user_updated','Updated access for '+name+'.',{email:old.email,before:{role:old.role,status:old.status},after:{role,status}})]);
+ }
+ throw new InputError('This user action is not supported.');
 }
