@@ -1,5 +1,6 @@
 import { InputError, validateLicense, matchKey, DEFAULT_LEAD_DAYS, parseDate, moneyMinor, emailValid, recipientsInput, leadDaysInput, todayUTC, displayMoney } from './domain.ts';
 import type { License, LicenseInput, Settings } from './domain.ts';
+import {emailConnected} from './email-connection.ts';
 import { encryptSecret } from './secrets.ts';
 import type {Database,Statement} from './database.ts';
 import {canManage,requireAccess,normalizeEmail,ownerAllowed,listMembers} from './access.ts';
@@ -14,12 +15,12 @@ export async function initialize(db:Database,viewer?:Viewer){
  await db.prepare(`INSERT INTO settings (id,owner_id,sender_name,sender_email,reply_to,recipients,lead_days,lead_months,overdue_interval,enabled,schedule_registered,updated_at) VALUES(1,?,?,?,?,?,?,2,7,0,0,?) ON CONFLICT (id) DO NOTHING`).bind(viewer?.role==='owner'?viewer.userId:'','ICDD License Renewal Tracker','','','[]',JSON.stringify(DEFAULT_LEAD_DAYS),iso()).run();
  if(viewer?.role==='owner')await db.prepare('UPDATE settings SET owner_id=? WHERE id=1 AND owner_id<>?').bind(viewer.userId,viewer.userId).run();
 }
-export function safeSettings(r:Row):Settings&{lastTestAt:string|null}{return {senderName:r.sender_name,senderEmail:r.sender_email,replyTo:r.reply_to,recipients:JSON.parse(r.recipients),leadDays:JSON.parse(r.lead_days),leadMonths:r.lead_months??2,overdueInterval:r.overdue_interval,enabled:!!r.enabled,apiKeySet:!!r.encrypted_api_key,jobLastChecked:r.job_last_checked,jobLastResult:r.job_last_result,scheduleRegistered:!!r.schedule_registered,lastTestAt:r.last_test_at}}
+export function safeSettings(r:Row):Settings&{lastTestAt:string|null}{return {emailProvider:r.email_provider||'resend',connectionSet:emailConnected(r),gmailSender:r.gmail_sender||'',gmailConnected:r.gmail_verified===1&&r.gmail_schedule_registered===1,gmailLastChecked:r.gmail_last_checked||null,gmailLastResult:r.gmail_last_result||null,senderName:r.sender_name,senderEmail:r.sender_email,replyTo:r.reply_to,recipients:JSON.parse(r.recipients),leadDays:JSON.parse(r.lead_days),leadMonths:r.lead_months??2,overdueInterval:r.overdue_interval,enabled:!!r.enabled,apiKeySet:!!r.encrypted_api_key,jobLastChecked:r.job_last_checked,jobLastResult:r.job_last_result,scheduleRegistered:!!r.schedule_registered,lastTestAt:r.last_test_at}}
 export async function getState(db:Database,viewer:Viewer){
  await initialize(db,viewer);
  const [records,renewals,activity,emails,settings]=await Promise.all([all(db,'SELECT * FROM licenses ORDER BY created_at DESC LIMIT 5000'),all(db,'SELECT r.*,l.name FROM renewals r JOIN licenses l ON l.id=r.license_id ORDER BY r.created_at DESC LIMIT 500'),all(db,'SELECT * FROM activity ORDER BY created_at DESC LIMIT 250'),all(db,'SELECT id,recipient,subject,status,provider_id,error,attempts,created_at,updated_at FROM email_log ORDER BY created_at DESC LIMIT 100'),one(db,'SELECT * FROM settings WHERE id=1')]);
  const admin=canManage(viewer.role),safe=safeSettings(settings!);
- return {licenses:records.map(toLicense),renewals,activity,emails:admin?emails:[],members:admin?await listMembers(db):[],settings:admin?safe:{...safe,senderEmail:'',replyTo:'',recipients:[],apiKeySet:false},viewer:{displayName:viewer.displayName,email:viewer.email,role:viewer.role},today:todayUTC()};
+ return {licenses:records.map(toLicense),renewals,activity,emails:admin?emails:[],members:admin?await listMembers(db):[],settings:admin?safe:{...safe,senderEmail:'',replyTo:'',recipients:[],apiKeySet:false,connectionSet:false},viewer:{displayName:viewer.displayName,email:viewer.email,role:viewer.role},today:todayUTC()};
 }
 const columns=['id','sn','name','vendor','license_type','department','purchase_date','expiry_date','quantity_purchased','seat_count','quantity_in_use','status','last_payment_date','last_payment_minor','notes','match_key','created_at','updated_at','archived_at'];
 function sqlRow(v:LicenseInput,id:string,now:string,created=now,archivedAt:string|null=null):Row{return {id,sn:v.sn,name:v.name,vendor:v.vendor,license_type:v.licenseType,department:v.department,purchase_date:v.purchaseDate,expiry_date:v.expiryDate,quantity_purchased:v.quantityPurchased,seat_count:v.seatCount,quantity_in_use:v.quantityInUse,status:v.status,last_payment_date:v.lastPaymentDate,last_payment_minor:v.lastPaymentMinor,notes:v.notes,match_key:matchKey(v),created_at:created,updated_at:now,archived_at:archivedAt}}
@@ -68,12 +69,13 @@ export async function updateSettings(db:Database,viewer:Viewer,body:Row,encrypti
  requireAccess(viewer,'manage');
  await initialize(db,viewer);const old=(await one(db,'SELECT * FROM settings WHERE id=1'))!;
  const senderName=String(body.senderName||'ICDD License Renewal Tracker').trim();if(senderName.length>100||/[<>\r\n]/.test(senderName))throw new InputError('Enter a short sender name without angle brackets.');
- const senderEmail=String(body.senderEmail||'').trim().toLowerCase(),replyTo=String(body.replyTo||'').trim().toLowerCase();if(senderEmail&&!emailValid(senderEmail))throw new InputError('Enter a valid sender email.');if(replyTo&&!emailValid(replyTo))throw new InputError('Enter a valid reply-to email.');
+ const provider=String(body.emailProvider||old.email_provider||'resend');if(!['resend','gmail'].includes(provider))throw new InputError('Choose Gmail or Resend for delivery.');
+ const senderEmail=provider==='gmail'?String(old.gmail_sender||old.sender_email):String(body.senderEmail||'').trim().toLowerCase(),replyTo=String(body.replyTo||'').trim().toLowerCase();if(senderEmail&&!emailValid(senderEmail))throw new InputError('Enter a valid sender email.');if(replyTo&&!emailValid(replyTo))throw new InputError('Enter a valid reply-to email.');
  const recipients=recipientsInput(body.recipients),leadDays=leadDaysInput(body.leadDays),interval=Number(body.overdueInterval),months=Number(body.leadMonths??2);if(!Number.isInteger(months)||months<0||months>12)throw new InputError('Months before renewal must be between 0 and 12.');if(!Number.isInteger(interval)||interval<0||interval>30)throw new InputError('Overdue repeat must be between 0 and 30 days.');
  let encrypted=old.encrypted_api_key;const newKey=String(body.apiKey||'').trim();if(body.removeApiKey===true)encrypted=null;else if(newKey){if(!/^re_[a-zA-Z0-9_\-]{12,180}$/.test(newKey))throw new InputError('Enter a valid Resend API key.');if(!encryptionKey)throw new InputError('The secure email connection is not available. Please contact the tracker owner.');encrypted=await encryptSecret(newKey,encryptionKey)}
- if(body.enabled&&(!encrypted||!senderEmail||!recipients.length))throw new InputError('Add a sender, recipients and an email connection before enabling reminders.');
- const changed=senderEmail!==old.sender_email||!!newKey||body.removeApiKey===true;
- await db.batch([db.prepare('UPDATE settings SET sender_name=?,sender_email=?,reply_to=?,recipients=?,lead_days=?,lead_months=?,overdue_interval=?,enabled=?,encrypted_api_key=?,last_test_at=?,updated_at=? WHERE id=1').bind(senderName,senderEmail,replyTo,JSON.stringify(recipients),JSON.stringify(leadDays),months,interval,body.enabled?1:0,encrypted,changed?null:old.last_test_at,iso()),audit(db,viewer.email,'settings','Updated email reminder settings.',{enabled:!!body.enabled,leadDays,leadMonths:months,overdueInterval:interval,recipientCount:recipients.length})]);
+ if(body.enabled&&(!emailConnected({...old,email_provider:provider,encrypted_api_key:encrypted,sender_email:senderEmail})||!senderEmail||!recipients.length))throw new InputError('Connect the sender and add recipients before enabling reminders.');
+ const changed=provider!==old.email_provider||senderEmail!==old.sender_email||!!newKey||body.removeApiKey===true;
+ await db.batch([db.prepare('UPDATE settings SET email_provider=?,sender_name=?,sender_email=?,reply_to=?,recipients=?,lead_days=?,lead_months=?,overdue_interval=?,enabled=?,encrypted_api_key=?,last_test_at=?,updated_at=? WHERE id=1').bind(provider,senderName,senderEmail,replyTo,JSON.stringify(recipients),JSON.stringify(leadDays),months,interval,body.enabled?1:0,encrypted,changed?null:old.last_test_at,iso()),audit(db,viewer.email,'settings','Updated email reminder settings.',{enabled:!!body.enabled,leadDays,leadMonths:months,overdueInterval:interval,recipientCount:recipients.length})]);
  return {ok:true,message:'Email settings saved.'};
 }
 
@@ -87,19 +89,25 @@ export async function manageMember(db:Database,viewer:Viewer,body:Row){
  if(!['admin','editor','viewer'].includes(role))throw new InputError('Choose Admin, Editor or View only.');
  if(!['active','suspended'].includes(status))throw new InputError('Choose active or suspended access.');
  const now=iso();
+ async function recipientChange(email:string){
+  if(body.notifyRenewals===undefined&&status!=='suspended')return [];
+  const settings=(await one(db,'SELECT recipients FROM settings WHERE id=1'))!,current=JSON.parse(settings.recipients) as string[];
+  const recipients=recipientsInput(status==='suspended'||body.notifyRenewals!==true?current.filter(value=>value!==email):[...current,email]);
+  return [db.prepare('UPDATE settings SET recipients=?,updated_at=? WHERE id=1').bind(JSON.stringify(recipients),now)];
+ }
  if(action==='addUser'){
   const email=normalizeEmail(String(body.email||''));if(!emailValid(email))throw new InputError('Enter a valid user email address.');
   if(ownerAllowed(email))throw new InputError('This email is the workspace owner and already has access.');
   if(await one(db,'SELECT id FROM workspace_users WHERE email=?',email))throw new InputError('This user has already been added. Choose Edit access to make changes.');
   const count=await one(db,'SELECT COUNT(*) AS n FROM workspace_users');if(count!.n>=250)throw new InputError('This workspace supports up to 250 users.');
   const id=crypto.randomUUID();
-  return commit(db,requestId,action,{ok:true,message:'User added. They can sign in with an email code.'},[db.prepare('INSERT INTO workspace_users(id,email,name,role,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)').bind(id,email,name,role,status,viewer.email,now,now),audit(db,viewer.email,'user_added','Added '+name+' to the workspace.',{email,role,status})]);
+  return commit(db,requestId,action,{ok:true,message:'User added. They can sign in with an email code.'},[...await recipientChange(email),db.prepare('INSERT INTO workspace_users(id,email,name,role,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)').bind(id,email,name,role,status,viewer.email,now,now),audit(db,viewer.email,'user_added','Added '+name+' to the workspace.',{email,role,status})]);
  }
  if(action==='updateUser'){
   const old=await one(db,'SELECT * FROM workspace_users WHERE id=?',String(body.id||''));if(!old)throw new InputError('This user could not be found.');
   if(old.role==='owner'||ownerAllowed(old.email))throw new InputError('The workspace owner cannot be changed here.');
   if(old.email===viewer.email)throw new InputError('Ask another admin to change your own access.');
-  return commit(db,requestId,action,{ok:true,message:status==='suspended'?'User access suspended.':'User access updated.'},[db.prepare('UPDATE workspace_users SET name=?,role=?,status=?,updated_at=? WHERE id=?').bind(name,role,status,now,old.id),audit(db,viewer.email,'user_updated','Updated access for '+name+'.',{email:old.email,before:{role:old.role,status:old.status},after:{role,status}})]);
+  return commit(db,requestId,action,{ok:true,message:status==='suspended'?'User access suspended.':'User access updated.'},[...await recipientChange(old.email),db.prepare('UPDATE workspace_users SET name=?,role=?,status=?,updated_at=? WHERE id=?').bind(name,role,status,now,old.id),audit(db,viewer.email,'user_updated','Updated access for '+name+'.',{email:old.email,before:{role:old.role,status:old.status},after:{role,status}})]);
  }
  throw new InputError('This user action is not supported.');
 }
