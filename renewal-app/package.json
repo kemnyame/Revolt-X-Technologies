@@ -1,0 +1,35 @@
+{
+  "name": "icdd-license-renewal-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "next dev -H 0.0.0.0",
+    "build": "next build",
+    "start": "node scripts/start.mjs",
+    "db:migrate": "node --experimental-strip-types scripts/migrate.ts",
+    "reminders:run": "node --experimental-strip-types scripts/run-reminders.ts",
+    "test": "node --experimental-strip-types --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "next": "16.3.4",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "lucide-react": "1.31.0",
+    "exceljs": "4.4.0",
+    "@neondatabase/auth": "0.7.0-beta",
+    "pg": "^8.16.3",
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@types/pg": "^8.15.5",
+    "typescript": "5.9.3",
+    "drizzle-kit": "0.31.10"
+  }
+}
