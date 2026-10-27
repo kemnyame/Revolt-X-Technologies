@@ -12,11 +12,17 @@ Private software, hardware and service renewal tracking on Render with a Neon Po
 
 ## Email setup
 
-In **Email reminders**, enter a sender address on a verified Resend domain, a sending-only API key and the recipients. Save and send a test before enabling reminders. The current connected sending domains were not verified at migration time, so sending stays disabled until a working connection is supplied.
+This tracker supports its owner's connected Gmail account. Gmail delivery uses the authorized ChatGPT Gmail connection, not Resend and not SMTP credentials copied into the website. The connected account must match the saved sender. A ChatGPT task checks the protected Neon queue hourly, submits each message through Gmail, and records the actual Gmail message ID. The task and both Gmail and Neon connections must stay enabled for delivery.
+
+In **Email reminders**, choose Connected Gmail account, add any valid recipient addresses and enable reminders. Gmail does not require verifying a domain in Resend. Tests queue for the next delivery check; a queued message is not labeled accepted until Gmail returns a message ID. Gmail and other providers still apply their normal sending and delivery limits.
+
+In **Users & access**, “Receive renewal emails” is selected when adding a user. Clear it for someone who only needs workspace access. Suspending a user removes their address from the reminder recipient list. Other recipients can be added directly in Email reminders without giving them login access. Up to 10 addresses can be saved.
 
 `Months before renewal` defaults to 2. Additional reminder days default to 30, 14, 7, 1 and 0. A value of 0 months enables day-based reminders only. Inactive, suspended, retired, cancelled and archived records are excluded. Imports inside the reminder window are included at the next check.
 
-The API key is encrypted in PostgreSQL with AES-GCM using the runtime-only `EMAIL_SETTINGS_KEY`. Notification emails contain the item, vendor, owner and renewal date. Payments and notes are excluded. A lease, immutable request payloads and provider idempotency keys prevent duplicate requests. Uncertain requests beyond the provider retry window are held for review.
+The daily Neon Function check prepares immutable requests. The Gmail delivery task claims each request once, checks that its sender, recipient and records are still eligible, then acknowledges submission. Paused renewal reminders are held. Explicitly queued connection tests can still be sent while renewal reminders are paused. Interrupted or uncertain submissions are held for review instead of automatically resent. Message content is data, never instructions to the delivery task.
+
+Payments, notes and seat counts stay in the tracker. Notifications contain the item, vendor, owner and renewal date. Gmail access tokens are never copied into this app, its database, source or task prompt. Resend remains an optional alternative for a verified company domain; its saved key is encrypted with AES-GCM using the runtime-only `EMAIL_SETTINGS_KEY`.
 
 ## Hosting
 
@@ -32,6 +38,6 @@ Required runtime settings are listed in `.env.example`. Set values only in Rende
 
 `scripts/check-release.mjs` applies the migration to the isolated Neon development branch, tests real PostgreSQL imports, transactions, history, role permissions, user suspension, encryption and two-month reminder deduplication using synthetic records and a mocked mail provider, then applies migrations to production. Development test records are archived after each run; tests never send real email. The web build then runs `next build`.
 
-Recipients may be any valid email address, whether or not they have tracker access. A manual connection test can target any address without changing the saved reminder list. Adding a workspace user does not automatically send an invitation or subscribe them to alerts. Gmail addresses can receive notifications or be the reply-to address; the outgoing sender must use a verified sending domain.
+Recipients may be any valid email address, whether or not they have tracker access. A manual connection test can target any address without changing the saved reminder list. Adding a workspace user does not send an invitation. Their renewal subscription is controlled by the Receive renewal emails checkbox. The Gmail option sends through the connected account. The Resend option requires a verified sending domain.
 
-The original register was empty at migration time. Sender, recipient and email connection setup remain in the app. No live licence records or payments were fabricated during the move.
+The original register was empty at migration time. Sender, recipient and reminder controls remain in the app. No live licence records or payments were fabricated during the move.
