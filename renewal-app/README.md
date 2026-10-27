@@ -8,7 +8,7 @@ Private software, hardware and service renewal tracking on Render with a Neon Po
 - A searchable register, renewal calendar, Ghana cedi amounts, archived records and full renewal history.
 - Reminder emails beginning **two calendar months before expiry**, with optional day-based follow-ups and overdue repeats. Month-end dates clamp to the last valid day, so 30 April 2027 starts on 28 February 2027.
 - Separate logs for provider acceptance, failure, retries and requests needing review. Acceptance is not a claim of inbox delivery.
-- Passwordless email-code sign-in, with a server-enforced allowlist for workspace owners.
+- Passwordless email-code sign-in, with owner, admin, editor and view-only roles. Admins add or suspend people in **Users & access**.
 
 ## Email setup
 
@@ -24,12 +24,14 @@ This app is deployed from the `icdd-license-renewal-tracker` branch in the exist
 
 Required runtime settings are listed in `.env.example`. Set values only in Render's environment settings. PostgreSQL connections use certificate-validated TLS. Normal queries use the pooled Neon URL; Drizzle migrations use the direct URL. Never place credentials, licence data or email addresses in public source files.
 
-`ADMIN_EMAILS` is the server-side allowlist. Sign-in codes are issued by Neon Auth using the same-origin Next.js auth proxy. Session and verified email checks are required on every protected API. Arbitrary signup, password and admin auth methods are not exposed by this app. Configure a dedicated production SMTP provider in Neon Auth when a verified sending domain is ready; the initial managed auth mailer uses Neon's shared sender.
+`ADMIN_EMAILS` identifies the bootstrap owner. Active users added in the workspace can also sign in; their role and status are rechecked on every protected request. Owner access cannot be removed through user management. Sign-in codes are issued by Neon Auth using the same-origin Next.js auth proxy. Session and verified email checks are required on every protected API. Arbitrary signup, password and admin auth methods are not exposed by this app. Configure a dedicated production SMTP provider in Neon Auth when a verified sending domain is ready; the initial managed auth mailer uses Neon's shared sender.
 
-`/api/reminders/run` and `/api/reminders/status` require an authorised owner session or the runtime `CRON_SECRET` in an Authorization bearer header. They are not public write endpoints. The health endpoint exposes connectivity only.
+`/api/reminders/run` and `/api/reminders/status` require an authorised owner/admin session or the runtime `CRON_SECRET` in an Authorization bearer header. They are not public write endpoints. The health endpoint exposes connectivity only.
 
 ## Release checks
 
-`scripts/check-release.mjs` applies the migration to the isolated Neon development branch, tests real PostgreSQL imports, transactions, history, owner restrictions, encryption and two-month reminder deduplication using synthetic records and a mocked mail provider, then applies migrations to production. Development test records are archived after each run; tests never send real email. The web build then runs `next build`.
+`scripts/check-release.mjs` applies the migration to the isolated Neon development branch, tests real PostgreSQL imports, transactions, history, role permissions, user suspension, encryption and two-month reminder deduplication using synthetic records and a mocked mail provider, then applies migrations to production. Development test records are archived after each run; tests never send real email. The web build then runs `next build`.
+
+Recipients may be any valid email address, whether or not they have tracker access. A manual connection test can target any address without changing the saved reminder list. Adding a workspace user does not automatically send an invitation or subscribe them to alerts. Gmail addresses can receive notifications or be the reply-to address; the outgoing sender must use a verified sending domain.
 
 The original register was empty at migration time. Sender, recipient and email connection setup remain in the app. No live licence records or payments were fabricated during the move.
