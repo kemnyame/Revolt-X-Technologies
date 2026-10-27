@@ -42,7 +42,7 @@ test('saved credentials use authenticated encryption',async()=>{const key='ab'.r
 test('real PostgreSQL: imports, transactions, renewal history, workspace access and two-month email deduplication',{skip:!process.env.TEST_DATABASE_URL},async()=>{
  const {db,close}=createDatabase(process.env.TEST_DATABASE_URL!);const viewer:Viewer={userId:'icdd-development-qa',email:'qa@example.test',displayName:'QA only',role:'owner'},request=(action:string,data:Record<string,unknown>={})=>({action,requestId:crypto.randomUUID(),...data}),suffix=crypto.randomUUID().slice(0,8),key='ab'.repeat(32);
  try{
- await initialize(db,viewer);
+ await initialize(db,viewer);await db.prepare("UPDATE settings SET email_provider='resend' WHERE id=1").run();
  const action=request('create',{record:input({name:'QA Office '+suffix,sn:'ABC-1'})});const created=await mutateRecords(db,viewer,action) as any;assert.deepEqual(await mutateRecords(db,viewer,action),created);
  await assert.rejects(mutateRecords(db,viewer,request('create',{record:input({name:'QA Office '+suffix})})),/matching/);
  const before=(await getState(db,viewer)).licenses.length;
@@ -67,8 +67,8 @@ test('real PostgreSQL: imports, transactions, renewal history, workspace access 
   const ownerIdentity={id:viewer.userId,email:viewer.email,name:'QA only',emailVerified:true};
   assert.equal((await resolveAccess(db,ownerIdentity)).role,'owner');
   const memberEmail='qa-member-'+suffix+'@example.test';
-  await manageMember(db,viewer,request('addUser',{email:memberEmail,name:'QA member',role:'viewer'}));
-  assert.equal(await emailAllowed(db,memberEmail.toUpperCase()),true);
+  await manageMember(db,viewer,request('addUser',{email:memberEmail,name:'QA member',role:'viewer',notifyRenewals:true}));
+  assert.equal(await emailAllowed(db,memberEmail.toUpperCase()),true);assert.ok(JSON.parse((await one(db,'SELECT recipients FROM settings WHERE id=1'))!.recipients).includes(memberEmail));
   assert.equal(await emailAllowed(db,'unlisted@example.test'),false);
   const identity={id:'qa-member-'+suffix,email:memberEmail,emailVerified:true},member=await resolveAccess(db,identity);
   assert.equal(member.role,'viewer');assert.equal((await getState(db,member)).members.length,0);
@@ -84,7 +84,7 @@ test('real PostgreSQL: imports, transactions, renewal history, workspace access 
   await assert.rejects(manageMember(db,admin,request('updateUser',{id:ownerRow.id,name:'QA owner',role:'viewer'})),/owner/);
   await assert.rejects(manageMember(db,admin,request('updateUser',{id:row.id,name:'QA member',role:'viewer'})),/own access/);
   await manageMember(db,viewer,request('updateUser',{id:row.id,name:'QA member',role:'admin',status:'suspended'}));
-  assert.equal(await emailAllowed(db,memberEmail),false);await assert.rejects(resolveAccess(db,identity),/does not have access/);
+  assert.equal(await emailAllowed(db,memberEmail),false);assert.ok(!JSON.parse((await one(db,'SELECT recipients FROM settings WHERE id=1'))!.recipients).includes(memberEmail));await assert.rejects(resolveAccess(db,identity),/does not have access/);
  }finally{if(oldOwners===undefined)delete process.env.ADMIN_EMAILS;else process.env.ADMIN_EMAILS=oldOwners}
 
  const mailItem=await mutateRecords(db,viewer,request('create',{record:input({name:'QA email '+suffix})})) as any;
@@ -100,6 +100,30 @@ test('real PostgreSQL: imports, transactions, renewal history, workspace access 
  await assert.rejects(testEmail(db,config,testId,testFetcher,'different@example.test'),/new test/);
  await assert.rejects(testEmail(db,config,crypto.randomUUID(),testFetcher,'invalid'),/valid email/);
  assert.deepEqual(JSON.parse((await one(db,'SELECT recipients FROM settings WHERE id=1'))!.recipients),['qa@example.test']);
+ await db.prepare("UPDATE settings SET email_provider='gmail',gmail_sender='qa@gmail.com',gmail_verified=1,gmail_schedule_registered=1,sender_email='qa@gmail.com' WHERE id=1").run();
+ await updateSettings(db,viewer,{emailProvider:'gmail',senderEmail:'spoof@example.test',recipients:['outside-workspace@example.test'],leadMonths:2,leadDays:[30,14,7,1,0],overdueInterval:7,enabled:true},key);
+ assert.equal((await getState(db,viewer)).settings.senderEmail,'qa@gmail.com');
+ let gmailNetworkCalls=0;const noNetwork=async()=>{gmailNetworkCalls++;throw new Error('Gmail must use the protected queue')};
+ const queued=await runReminders(db,config,{now:new Date('2026-10-28'),fetcher:noNetwork});assert.equal(queued.queued,1);assert.equal(queued.accepted,0);assert.equal(gmailNetworkCalls,0);
+ assert.equal((await runReminders(db,config,{now:new Date('2026-10-28'),fetcher:noNetwork})).queued,0);
+ const claim=async(sender='qa@gmail.com')=>(await one(db,'SELECT icdd_claim_gmail_delivery(?,10) AS data',sender))!.data;
+ assert.equal((await claim('wrong@gmail.com')).state,'account_mismatch');
+ const claims=await claim();assert.equal(claims.deliveries.length,1);const delivery=claims.deliveries[0];assert.equal(delivery.recipient,'outside-workspace@example.test');assert.ok(!delivery.text.includes('Internal note'));assert.ok(!delivery.text.includes('12,345.67'));
+ assert.equal((await one(db,'SELECT icdd_gmail_delivery_permitted(?,?) AS permitted',delivery.id,delivery.claim_token))!.permitted,true);
+ assert.equal((await claim()).deliveries.length,0);
+ const finish=(id:string,token:string,providerId:string|null,error:string|null=null)=>one(db,'SELECT icdd_finish_gmail_delivery(?,?,?,?) AS data',id,token,providerId,error);
+ assert.equal((await finish(delivery.id,delivery.claim_token,'qa-gmail-test-'+suffix))!.data.state,'accepted');assert.equal((await finish(delivery.id,delivery.claim_token,'qa-gmail-test-'+suffix))!.data.ok,false);
+ assert.equal((await runReminders(db,config,{now:new Date('2026-10-28'),fetcher:noNetwork})).queued,0);
+ const gmailTestId=crypto.randomUUID();await testEmail(db,config,gmailTestId,noNetwork,'test-recipient@example.test');await testEmail(db,config,gmailTestId,noNetwork,'test-recipient@example.test');
+ await db.prepare('UPDATE settings SET enabled=0 WHERE id=1').run();const testClaims=await claim();assert.equal(testClaims.deliveries.length,1);assert.equal(testClaims.deliveries[0].recipient,'test-recipient@example.test');
+ await finish(testClaims.deliveries[0].id,testClaims.deliveries[0].claim_token,'qa-gmail-test-manual-'+suffix);
+ await mutateRecords(db,viewer,request('renew',{id:mailItem.id,nextExpiry:'2026-12-29'}));await db.prepare('UPDATE settings SET enabled=1 WHERE id=1').run();
+ assert.equal((await runReminders(db,config,{now:new Date('2026-10-29'),fetcher:noNetwork})).queued,1);
+ await db.prepare('UPDATE settings SET recipients=? WHERE id=1').bind(JSON.stringify(['different-recipient@example.test'])).run();assert.equal((await claim()).deliveries.length,0);
+ assert.equal((await one(db,"SELECT COUNT(*) AS n FROM email_log WHERE status='queued' AND delivery_provider='gmail'"))!.n,0);
+ await testEmail(db,config,crypto.randomUUID(),noNetwork,'interrupted@example.test');const interrupted=(await claim()).deliveries[0];
+ await db.prepare('UPDATE email_log SET claimed_at=? WHERE id=?').bind(new Date(Date.now()-21*60000).toISOString(),interrupted.id).run();
+ assert.equal((await claim()).deliveries.length,0);assert.equal((await one(db,'SELECT status FROM email_log WHERE id=?',interrupted.id))!.status,'needs_review');assert.equal(gmailNetworkCalls,0);
  console.log('Only synthetic records in the isolated development branch were used. No real email was sent.');
  }finally{await db.prepare("UPDATE licenses SET archived_at=? WHERE department='QA only' AND archived_at IS NULL").bind(new Date().toISOString()).run();await db.prepare('UPDATE settings SET enabled=0 WHERE id=1').run();await db.prepare("UPDATE workspace_users SET status='suspended' WHERE email LIKE 'qa-%@example.test'").run();await close()}
 });
