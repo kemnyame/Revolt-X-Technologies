@@ -5,8 +5,8 @@
     "serviceId": "srv-dbg63ei9lscs7395d1kg",
     "workspaceId": "tea-dakk52h5efls73ea2u6g",
     "url": "https://icdd-license-renewal-tracker.onrender.com",
-    "liveCommit": "263d25f9a0010474467b91836ecca16229d6ea24",
-    "deployId": "dep-dbg6k1dgtmfc73bcgtj0"
+    "liveCommit": "338c45e738c4aaa90d263f8f91c54b0a9caa1106",
+    "deployId": "dep-dbg7oig473hc73ffuapg"
   },
   "source": {
     "repository": "kemnyame/Revolt-X-Technologies",
@@ -56,8 +56,13 @@
     "signIn": "Email code"
   },
   "email": {
+    "provider": "Connected Gmail",
+    "delivery": "ChatGPT Gmail and Neon connections",
+    "automationId": "6ae07ca4af5881918df194445791de56",
+    "cadence": "Hourly",
+    "activationPending": false,
+    "testSubmissionVerified": true,
     "recipientDomains": "Any valid email address",
-    "senderRequiresVerifiedDomain": true,
-    "activationPending": true
+    "maxRecipients": 10
   }
 }
