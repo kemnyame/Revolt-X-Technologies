@@ -1,0 +1,47 @@
+{
+  "app": {
+    "name": "ICDD License Renewal Tracker",
+    "platform": "Render",
+    "serviceId": "srv-dbg63ei9lscs7395d1kg",
+    "workspaceId": "tea-dakk52h5efls73ea2u6g",
+    "url": "https://icdd-license-renewal-tracker.onrender.com",
+    "liveCommit": "3e801eb10d042e2824a07ef84857ebdd5b47597e"
+  },
+  "source": {
+    "repository": "kemnyame/Revolt-X-Technologies",
+    "branch": "icdd-license-renewal-tracker",
+    "appDirectory": "renewal-app",
+    "schedulerDirectory": "renewal-worker"
+  },
+  "database": {
+    "platform": "Neon",
+    "projectId": "red-mud-64374274",
+    "productionBranchId": "br-ancient-wildflower-b9usr1w6",
+    "developmentBranchId": "br-delicate-morning-b9h02lqb",
+    "databaseName": "icdd_tracker"
+  },
+  "scheduler": {
+    "platform": "Neon Function Trigger",
+    "slug": "renewalcheck",
+    "triggerId": "trigger-49aeccd1-1592-4d1f-a0e8-9aac417176b0",
+    "cron": "0 8 * * *",
+    "timezone": "UTC"
+  },
+  "reminderDefault": {
+    "calendarMonthsBefore": 2,
+    "followupDays": [
+      30,
+      14,
+      7,
+      1,
+      0
+    ],
+    "overdueRepeatDays": 7
+  },
+  "legacy": {
+    "siteProjectId": "appgprj_6adf2109f048819184a1ecf5abccb8e3",
+    "automationId": "Automation_ff3f676869e8819193c4ca8ad8a6d10e",
+    "automationPaused": true
+  },
+  "verifiedAt": "2026-10-27"
+}
