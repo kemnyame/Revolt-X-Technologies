@@ -5,7 +5,8 @@
     "serviceId": "srv-dbg63ei9lscs7395d1kg",
     "workspaceId": "tea-dakk52h5efls73ea2u6g",
     "url": "https://icdd-license-renewal-tracker.onrender.com",
-    "liveCommit": "3e801eb10d042e2824a07ef84857ebdd5b47597e"
+    "liveCommit": "263d25f9a0010474467b91836ecca16229d6ea24",
+    "deployId": "dep-dbg6k1dgtmfc73bcgtj0"
   },
   "source": {
     "repository": "kemnyame/Revolt-X-Technologies",
@@ -43,5 +44,20 @@
     "automationId": "Automation_ff3f676869e8819193c4ca8ad8a6d10e",
     "automationPaused": true
   },
-  "verifiedAt": "2026-10-27"
+  "verifiedAt": "2026-10-27",
+  "access": {
+    "roles": [
+      "owner",
+      "admin",
+      "editor",
+      "viewer"
+    ],
+    "userManagement": "Users & access",
+    "signIn": "Email code"
+  },
+  "email": {
+    "recipientDomains": "Any valid email address",
+    "senderRequiresVerifiedDomain": true,
+    "activationPending": true
+  }
 }
