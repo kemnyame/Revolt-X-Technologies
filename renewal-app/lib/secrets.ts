@@ -1,0 +1,5 @@
+function rawKey(hex:string){if(!/^[0-9a-f]{64}$/i.test(hex))throw new Error('Email encryption is unavailable.');return new Uint8Array(hex.match(/../g)!.map(x=>parseInt(x,16)))}
+const encode=(bytes:Uint8Array)=>btoa(Array.from(bytes,b=>String.fromCharCode(b)).join(''));
+const decode=(text:string)=>new Uint8Array(Array.from(atob(text),c=>c.charCodeAt(0)));
+export async function encryptSecret(value:string,hex:string){const key=await crypto.subtle.importKey('raw',rawKey(hex),'AES-GCM',false,['encrypt']);const iv=crypto.getRandomValues(new Uint8Array(12));const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(value));return encode(iv)+'.'+encode(new Uint8Array(cipher))}
+export async function decryptSecret(value:string,hex:string){const [iv,cipher]=value.split('.');const key=await crypto.subtle.importKey('raw',rawKey(hex),'AES-GCM',false,['decrypt']);return new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:decode(iv)},key,decode(cipher)))}
