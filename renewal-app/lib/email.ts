@@ -3,6 +3,7 @@ import type { License } from './domain.ts';
 import { all, one, iso, initialize, safeSettings, toLicense } from './store.ts';
 import type { Row } from './store.ts';
 import type {Database} from './database.ts';
+import {emailConnected} from './email-connection.ts';
 import { decryptSecret } from './secrets.ts';
 export type EmailConfig={encryptionKey?:string;origin:string};
 export type Fetcher=(input:string,init:RequestInit)=>Promise<Response>;
@@ -47,15 +48,16 @@ export async function runReminders(db:Database,config:EmailConfig,options:{dryRu
   if(options.registerSchedule)await db.prepare('UPDATE settings SET schedule_registered=1 WHERE id=1').run();
   const records=(await all(db,'SELECT * FROM licenses WHERE archived_at IS NULL')).map(toLicense),leads=JSON.parse(settings.lead_days) as number[],recipients=JSON.parse(settings.recipients) as string[];
   const due=records.filter(record=>reminderBucket(record,leads,settings.overdue_interval,now,settings.lead_months??2)!==null);
-  let state=options.dryRun?'preview':!settings.enabled?'paused':!config.encryptionKey||!settings.encrypted_api_key||!settings.sender_email||!recipients.length?'not_configured':'ready',accepted=0,failed=0;
-  if(!settings.encrypted_api_key||!settings.sender_email||!recipients.length)state='not_configured';
+  const gmail=settings.email_provider==='gmail';
+  let state=options.dryRun?'preview':!settings.enabled?'paused':!emailConnected(settings)||(!gmail&&!config.encryptionKey)||!settings.sender_email||!recipients.length?'not_configured':'ready',accepted=0,failed=0,queued=0;
+  if(!emailConnected(settings)||!settings.sender_email||!recipients.length)state='not_configured';
   if(options.dryRun||state!=='ready'){
    await db.prepare('UPDATE settings SET job_last_checked=?,job_last_result=? WHERE id=1').bind(checkedAt,state).run();
    return {ok:true,state,accepted,failed,due:due.length,checkedAt};
   }
-  const apiKey=await decryptSecret(settings.encrypted_api_key,config.encryptionKey!);
+  const apiKey=gmail?'':await decryptSecret(settings.encrypted_api_key,config.encryptionKey!);
   // Retry an unchanged payload only inside the provider's 24-hour idempotency window.
-  const pending=await all(db,"SELECT * FROM email_log WHERE status IN ('retry','pending') ORDER BY created_at LIMIT 10");
+  const pending=gmail?[]:await all(db,"SELECT * FROM email_log WHERE delivery_provider='resend' AND status IN ('retry','pending') ORDER BY created_at LIMIT 10");
   for(const mail of pending){
    if(Date.now()-Date.parse(mail.created_at)>23*3600000||mail.attempts>=6){await db.batch([db.prepare("UPDATE email_log SET status='needs_review',error=?,updated_at=? WHERE id=?").bind('Acceptance is uncertain. Check the email provider logs before sending again.',iso(),mail.id),db.prepare("UPDATE reminder_events SET status='needs_review' WHERE email_id=?").bind(mail.id)]);continue}
    const events=await all(db,'SELECT * FROM reminder_events WHERE email_id=?',mail.id),stale=events.some(event=>!records.some(record=>record.id===event.license_id&&record.expiryDate===event.expiry_date&&!dormant(record)));
@@ -66,24 +68,26 @@ export async function runReminders(db:Database,config:EmailConfig,options:{dryRu
    const events=await all(db,'SELECT id,status FROM reminder_events WHERE recipient=?',recipient),known=new Map(events.map(event=>[event.id,event.status])),items:License[]=[],eventRows:Row[]=[];
    for(const item of due){const bucket=reminderBucket(item,leads,settings.overdue_interval,now,settings.lead_months??2)!,id=await hash([item.id,item.expiryDate,bucket,recipient].join('|'));if(known.has(id)&&!['failed','cancelled'].includes(known.get(id)))continue;items.push(item);eventRows.push({id,license_id:item.id,expiry_date:item.expiryDate,bucket,recipient})}
    if(!items.length)continue;
-   const emailId='renewal-'+await hash([settings.sender_email,recipient,...eventRows.map(e=>e.id).sort()].join('|'));
+   const emailId='renewal-'+await hash([gmail?'gmail':'resend',settings.sender_email,recipient,...eventRows.map(e=>e.id).sort()].join('|'));
    let mail=await one(db,'SELECT * FROM email_log WHERE id=?',emailId);
    if(mail?.status==='accepted'||mail?.status==='needs_review'||(mail&&mail.attempts>=3&&Date.parse(mail.updated_at)>=Date.parse(settings.updated_at)))continue;
    const payload:Payload=mail?JSON.parse(mail.payload):digestPayload(settings,recipient,items,config.origin,now),created=iso();
-   await db.batch([db.prepare("INSERT INTO email_log(id,recipient,subject,status,payload,attempts,created_at,updated_at) VALUES(?,?,?,'pending',?,0,?,?) ON CONFLICT (id) DO NOTHING").bind(emailId,recipient,payload.subject,JSON.stringify(payload),created,created),db.prepare("INSERT INTO reminder_events(id,license_id,expiry_date,bucket,recipient,email_id,status,created_at) SELECT v.id,v.license_id,v.expiry_date,v.bucket,v.recipient,?,'pending',? FROM jsonb_populate_recordset(NULL::reminder_events,?::jsonb) AS v WHERE true ON CONFLICT(id) DO UPDATE SET email_id=excluded.email_id,status='pending'").bind(emailId,created,JSON.stringify(eventRows))]);
+   await db.batch([db.prepare("INSERT INTO email_log(id,delivery_provider,recipient,subject,status,payload,attempts,created_at,updated_at) VALUES(?,?,?,?,?,?,0,?,?) ON CONFLICT (id) DO NOTHING").bind(emailId,gmail?'gmail':'resend',recipient,payload.subject,gmail?'queued':'pending',JSON.stringify(payload),created,created),db.prepare("INSERT INTO reminder_events(id,license_id,expiry_date,bucket,recipient,email_id,status,created_at) SELECT v.id,v.license_id,v.expiry_date,v.bucket,v.recipient,?,?,? FROM jsonb_populate_recordset(NULL::reminder_events,?::jsonb) AS v WHERE true ON CONFLICT(id) DO UPDATE SET email_id=excluded.email_id,status=excluded.status").bind(emailId,gmail?'queued':'pending',created,JSON.stringify(eventRows))]);
+   if(gmail){queued++;continue}
    try{const result=await sendProvider(apiKey,payload,emailId,options.fetcher);await recordOutcome(db,emailId,result);accepted++}catch(error){const e=error as DeliveryError;await recordOutcome(db,emailId,{error:e.message,attempts:e.attempts||1,retryable:e.retryable});failed++}
   }
-  const needsReview=(await one(db,"SELECT COUNT(*) AS n FROM email_log WHERE status='needs_review'"))!.n;state=failed?'attention_needed':needsReview?'needs_review':accepted?'accepted':'up_to_date';
+  const needsReview=(await one(db,"SELECT COUNT(*) AS n FROM email_log WHERE status='needs_review'"))!.n;state=failed?'attention_needed':needsReview?'needs_review':queued?'queued':accepted?'accepted':'up_to_date';
   await db.prepare('UPDATE settings SET job_last_checked=?,job_last_result=? WHERE id=1').bind(checkedAt,state).run();
-  return {ok:true,state,accepted,failed,needsReview,due:due.length,checkedAt};
+  return {ok:true,state,accepted,failed,queued,needsReview,due:due.length,checkedAt};
  }finally{await db.prepare('UPDATE job_lease SET lease_until=0 WHERE id=1 AND run_id=?').bind(runId).run()}
 }
 export async function testEmail(db:Database,config:EmailConfig,requestId:string,fetcher:Fetcher=fetch,requestedRecipient?:unknown){
  const settings=(await one(db,'SELECT * FROM settings WHERE id=1'))!,recipients=JSON.parse(settings.recipients) as string[];
  const recipient=String(requestedRecipient??recipients[0]??'').trim().toLowerCase();if(!emailValid(recipient))throw new InputError('Enter a valid email address for the test.');
- if(!settings.encrypted_api_key||!config.encryptionKey||!settings.sender_email)throw new InputError('Save your verified sender and email connection before sending a test.');
- const id='test-'+requestId,prior=await one(db,'SELECT status,provider_id,recipient,payload FROM email_log WHERE id=?',id);if(prior&&prior.recipient!==recipient)throw new InputError('Start a new test when choosing a different recipient.');if(prior?.status==='accepted')return {ok:true,message:'This test was already accepted by the email provider.'};
+ const gmail=settings.email_provider==='gmail';if(!emailConnected(settings)||(!gmail&&!config.encryptionKey)||!settings.sender_email)throw new InputError('Connect the sender before sending a test.');
+ const id=(gmail?'test-gmail-':'test-')+requestId,prior=await one(db,'SELECT status,provider_id,recipient,payload FROM email_log WHERE id=?',id);if(prior&&prior.recipient!==recipient)throw new InputError('Start a new test when choosing a different recipient.');if(prior?.status==='accepted')return {ok:true,message:'This test was already accepted by the email provider.'};
  const payload:Payload=prior?JSON.parse(prior.payload):{from:settings.sender_name+' <'+settings.sender_email+'>',to:[recipient],...(settings.reply_to?{reply_to:settings.reply_to}:{}),subject:'ICDD License Renewal Tracker · Email connection test',text:'Your ICDD License Renewal Tracker email connection is working. This is a connection test, not a licence renewal reminder. Open your tracker: '+config.origin,html:'<html lang="en"><body style="font:16px/1.7 Arial,sans-serif;color:#214d40"><h1 style="font-size:24px">Your email connection is working.</h1><p>This is a connection test from ICDD License Renewal Tracker. It is not a licence renewal reminder.</p><p><a href="'+escape(config.origin)+'">Open your renewal tracker</a></p></body></html>'};
- const now=iso();await db.prepare("INSERT INTO email_log(id,recipient,subject,status,payload,attempts,created_at,updated_at) VALUES(?,?,?,'pending',?,0,?,?) ON CONFLICT (id) DO NOTHING").bind(id,recipient,payload.subject,JSON.stringify(payload),now,now).run();
- try{const key=await decryptSecret(settings.encrypted_api_key,config.encryptionKey);const result=await sendProvider(key,payload,id,fetcher);await db.batch([db.prepare("UPDATE email_log SET status='accepted',provider_id=?,attempts=attempts+?,error=NULL,updated_at=? WHERE id=?").bind(result.id,result.attempts,iso(),id),db.prepare('UPDATE settings SET last_test_at=? WHERE id=1').bind(iso())]);return {ok:true,message:'Test accepted by the email provider for '+recipient+'. Check the inbox and spam folder.'}}catch(error){const e=error as DeliveryError;await recordOutcome(db,id,{error:e.message,attempts:e.attempts||1,retryable:e.retryable});throw new InputError(e.message)}
+ const now=iso();await db.prepare("INSERT INTO email_log(id,delivery_provider,recipient,subject,status,payload,attempts,created_at,updated_at) VALUES(?,?,?,?,?,?,0,?,?) ON CONFLICT (id) DO NOTHING").bind(id,gmail?'gmail':'resend',recipient,payload.subject,gmail?'queued':'pending',JSON.stringify(payload),now,now).run();
+ if(gmail)return {ok:true,state:'queued',message:'Test queued for Gmail delivery. Automatic delivery checks run hourly.'};
+ try{const key=await decryptSecret(settings.encrypted_api_key,config.encryptionKey!);const result=await sendProvider(key,payload,id,fetcher);await db.batch([db.prepare("UPDATE email_log SET status='accepted',provider_id=?,attempts=attempts+?,error=NULL,updated_at=? WHERE id=?").bind(result.id,result.attempts,iso(),id),db.prepare('UPDATE settings SET last_test_at=? WHERE id=1').bind(iso())]);return {ok:true,message:'Test accepted by the email provider for '+recipient+'. Check the inbox and spam folder.'}}catch(error){const e=error as DeliveryError;await recordOutcome(db,id,{error:e.message,attempts:e.attempts||1,retryable:e.retryable});throw new InputError(e.message)}
 }
