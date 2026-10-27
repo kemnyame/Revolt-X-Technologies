@@ -3,7 +3,7 @@ export const DEFAULT_LEAD_DAYS=[30,14,7,1,0];
 export const DEFAULT_LEAD_MONTHS=2;
 export type LicenseInput={sn:string;name:string;vendor:string;licenseType:string;department:string;purchaseDate:string|null;expiryDate:string|null;quantityPurchased:number|null;seatCount:number|null;quantityInUse:number|null;status:string;lastPaymentDate:string|null;lastPaymentMinor:number|null;notes:string};
 export type License=LicenseInput&{id:string;createdAt:string;updatedAt:string;archivedAt:string|null};
-export type Settings={senderName:string;senderEmail:string;replyTo:string;recipients:string[];leadDays:number[];leadMonths:number;overdueInterval:number;enabled:boolean;apiKeySet:boolean;jobLastChecked:string|null;jobLastResult:string|null;scheduleRegistered:boolean};
+export type Settings={emailProvider:'resend'|'gmail';connectionSet:boolean;gmailSender:string;gmailConnected:boolean;gmailLastChecked:string|null;gmailLastResult:string|null;senderName:string;senderEmail:string;replyTo:string;recipients:string[];leadDays:number[];leadMonths:number;overdueInterval:number;enabled:boolean;apiKeySet:boolean;jobLastChecked:string|null;jobLastResult:string|null;scheduleRegistered:boolean};
 export class InputError extends Error{status=400;constructor(message:string){super(message);this.name='InputError'}}
 const clean=(v:unknown,max:number)=>{const s=String(v??'').trim();if(s.length>max)throw new InputError(`A field exceeds ${max} characters.`);return s};
 export const normalKey=(s:string)=>s.normalize('NFKC').toLowerCase().replace(/\s+/g,' ').trim();
