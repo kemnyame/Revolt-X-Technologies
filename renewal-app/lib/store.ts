@@ -86,7 +86,7 @@ export async function manageMember(db:Database,viewer:Viewer,body:Row){
  const prior=await receipt(db,requestId,action);if(prior)return prior;
  const name=String(body.name||'').trim(),role=String(body.role) as Role,status=String(body.status||'active');
  if(!name||name.length>100)throw new InputError('Enter a name of up to 100 characters.');
- if(!['admin','editor','viewer'].includes(role))throw new InputError('Choose Admin, Editor or View only.');
+ if(!['admin','editor','reviewer','viewer'].includes(role))throw new InputError('Choose Admin, Editor, Control reviewer or View only.');
  if(!['active','suspended'].includes(status))throw new InputError('Choose active or suspended access.');
  const now=iso();
  async function recipientChange(email:string){

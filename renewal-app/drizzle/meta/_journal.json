@@ -22,6 +22,13 @@
       "when": 1793096250179,
       "tag": "0002_damp_cerebro",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793188863865,
+      "tag": "0003_icdd_management_portal",
+      "breakpoints": true
     }
   ]
 }
