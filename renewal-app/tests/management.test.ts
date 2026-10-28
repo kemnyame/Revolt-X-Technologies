@@ -50,7 +50,7 @@ test('PostgreSQL portal: independent decisions, evidence, concurrent saves, link
   const first=await mutateManagement(db,editor,createRequest);createdIds.push(first.id);assert.deepEqual(await mutateManagement(db,editor,createRequest),first);
   await assert.rejects(mutateManagement(db,editor,{...createRequest,title:'Different payload'}),/different change/);
   const exception=first.id as string;
-  await assert.rejects(create('action',{reviewerEmail:editor.email}),/different/);
+  await assert.rejects(create('action',{ownerEmail:reviewer.email,reviewerEmail:reviewer.email}),/different/);
   let r=await current(exception);
   const edits=await Promise.allSettled(['First concurrent change','Second concurrent change'].map(title=>mutateManagement(db,editor,request('update',{...r,title,id:r.id,version:r.version}))));
   assert.equal(edits.filter(e=>e.status==='fulfilled').length,1);assert.equal(edits.filter(e=>e.status==='rejected').length,1);
