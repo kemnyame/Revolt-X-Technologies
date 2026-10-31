@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {SAMPLE_PEOPLE} from './sample-data.ts';
 import type {Database} from './database.ts';
 import type {Viewer} from './access.ts';
 import {canManage} from './access.ts';
@@ -12,7 +13,7 @@ const one=async(db:Database,sql:string,...values:unknown[])=>db.prepare(sql).bin
 const rows=async(db:Database,sql:string,...values:unknown[])=> (await db.prepare(sql).bind(...values).all<Row>()).results;
 const run=async(db:Database,sql:string,...values:unknown[])=>db.prepare(sql).bind(...values).run();
 const base='SELECT p.*,u.name AS unit_name,r.reference AS related_reference FROM portal_records p JOIN portal_units u ON u.id=p.unit_id LEFT JOIN portal_records r ON r.id=p.related_id';
-export function mapRecord(r:Row):ControlRecord{return {id:r.id,reference:r.reference,module:r.module,title:r.title,description:r.description,area:r.area,unitId:r.unit_id,unitName:r.unit_name||'',category:r.category,priority:r.priority,status:r.status,ownerEmail:r.owner_email,reviewerEmail:r.reviewer_email,dueDate:r.due_date,details:r.details,licenseId:r.license_id||'',relatedId:r.related_id||'',relatedReference:r.related_reference||'',version:r.version,createdBy:r.created_by,updatedBy:r.updated_by,createdAt:r.created_at,updatedAt:r.updated_at,archivedAt:r.archived_at}}
+export function mapRecord(r:Row):ControlRecord{return {id:r.id,reference:r.reference,module:r.module,title:r.title,description:r.description,area:r.area,unitId:r.unit_id,unitName:r.unit_name||'',category:r.category,priority:r.priority,status:r.status,ownerEmail:r.owner_email,reviewerEmail:r.reviewer_email,dueDate:r.due_date,details:r.details,licenseId:r.license_id||'',relatedId:r.related_id||'',relatedReference:r.related_reference||'',version:r.version,createdBy:r.created_by,updatedBy:r.updated_by,createdAt:r.created_at,updatedAt:r.updated_at,archivedAt:r.archived_at,sampleSet:r.sample_set||null}}
 const eventMap=(r:Row):ControlEvent=>({id:r.id,recordId:r.record_id,reference:r.reference,action:r.action,note:r.note,actor:r.actor,createdAt:r.created_at,before:r.before,after:r.after});
 const evidenceMap=(r:Row):Evidence=>({id:r.id,name:r.name,mime:r.mime,size:r.size,sha256:r.sha256,uploadedBy:r.uploaded_by,createdAt:r.created_at});
 async function record(db:Database,id:string,lock=false){const r=await one(db,base+' WHERE p.id=?'+(lock?' FOR UPDATE OF p':''),id);if(!r)problem('This record could not be found.',404);return mapRecord(r)}
@@ -22,11 +23,11 @@ function currentVersion(body:Row,version:number){if(!Number.isSafeInteger(body.v
 async function event(db:Database,v:Viewer,recordId:string|null,action:string,note:string,before:unknown=null,after:unknown=null){await run(db,'INSERT INTO portal_events(id,record_id,action,note,actor,"before","after",created_at) VALUES(?,?,?,?,?,?,?,?)',crypto.randomUUID(),recordId,action,note,v.email,before==null?null:JSON.stringify(before),after==null?null:JSON.stringify(after),now())}
 async function contacts(db:Database):Promise<Contact[]>{return (await rows(db,"SELECT email,name,role FROM workspace_users WHERE status='active' ORDER BY name,email")).map(r=>({email:r.email,name:r.name,role:r.role}))}
 async function validateAssignments(db:Database,input:ControlInput,creator:string,existing?:ControlRecord){
- const unit=await one(db,"SELECT * FROM portal_units WHERE id=? AND status='active' FOR SHARE",input.unitId);if(!unit)problem('Choose an active team or branch. An admin can add it under Teams & branches.');
+ const unit=await one(db,"SELECT * FROM portal_units WHERE id=? AND status='active' FOR SHARE",input.unitId);if(!unit)problem('Choose an active team or branch. An admin can add it under Teams & branches.');if(unit.sample_set)problem('Choose a real team or branch for operational records. Sample teams are for demonstration only.');
  const people=await contacts(db),owner=people.find(p=>p.email===input.ownerEmail);if(!owner||!controlEdit(owner.role))problem('Choose an active owner with editor or reviewer access.');
  if(input.reviewerEmail){const reviewer=people.find(p=>p.email===input.reviewerEmail);if(!reviewer||!controlReview(reviewer.role))problem('Choose an active control reviewer or admin.');if([creator,input.ownerEmail].includes(input.reviewerEmail))problem('Choose a reviewer who is different from both the creator and owner.')}
  if(input.licenseId&&!await one(db,'SELECT id FROM licenses WHERE id=? AND archived_at IS NULL',input.licenseId))problem('The linked license is unavailable.');
- if(input.relatedId){const parent=await record(db,input.relatedId,true);if(parent.archivedAt)problem('The related record is archived.');if(terminal(parent.status)&&existing?.relatedId!==parent.id)problem('Reopen the parent record before linking new work.');if(existing){const cycle=await one(db,'WITH RECURSIVE parents AS (SELECT id,related_id FROM portal_records WHERE id=? UNION SELECT p.id,p.related_id FROM portal_records p JOIN parents x ON p.id=x.related_id) SELECT id FROM parents WHERE id=? LIMIT 1',input.relatedId,existing.id);if(cycle)problem('This link would create a cycle. Choose another related record.')}if(input.module==='check'&&(parent.module!=='control'||(parent.status!=='active'&&existing?.relatedId!==parent.id)))problem('A control check must link to an active control.')}
+ if(input.relatedId){const parent=await record(db,input.relatedId,true);if(parent.sampleSet)problem('Create and activate a real control before linking operational work. Sample records cannot be used as actual evidence.');if(parent.archivedAt)problem('The related record is archived.');if(terminal(parent.status)&&existing?.relatedId!==parent.id)problem('Reopen the parent record before linking new work.');if(existing){const cycle=await one(db,'WITH RECURSIVE parents AS (SELECT id,related_id FROM portal_records WHERE id=? UNION SELECT p.id,p.related_id FROM portal_records p JOIN parents x ON p.id=x.related_id) SELECT id FROM parents WHERE id=? LIMIT 1',input.relatedId,existing.id);if(cycle)problem('This link would create a cycle. Choose another related record.')}if(input.module==='check'&&parent.area!==unit.area)problem('The control check must be in the same control area as its control.');if(input.module==='check'&&(parent.module!=='control'||(parent.status!=='active'&&existing?.relatedId!==parent.id)))problem('A control check must link to an active control.')}
  else if(input.module==='check')problem('Link this check to an active control.');
  return unit;
 }
@@ -51,7 +52,7 @@ export async function mutateManagement(db:Database,v:Viewer,body:Row){
    await one(tx,'SELECT pg_advisory_xact_lock(hashtextextended(?,0))','unit:'+area+':'+name.toLowerCase());
    const duplicate=await one(tx,'SELECT id FROM portal_units WHERE lower(name)=lower(?) AND area=? AND id<>?',name,area,String(body.id||''));if(duplicate)problem('This team or branch already exists.');
    const id=body.action==='unitCreate'?crypto.randomUUID():textValue(body.id,'Team or branch',80,true),stamp=now();let before:Row|null=null;
-   if(body.action==='unitUpdate'){before=await one(tx,'SELECT * FROM portal_units WHERE id=? FOR UPDATE',id);if(!before)problem('This team or branch was not found.',404);currentVersion(body,before.version);if(before.area!==area&&await one(tx,'SELECT id FROM portal_records WHERE unit_id=? LIMIT 1',id))problem('The area is fixed once records exist. Create a separate team for the new area.');await run(tx,'UPDATE portal_units SET name=?,area=?,status=?,version=version+1,updated_at=? WHERE id=?',name,area,status,stamp,id)}
+   if(body.action==='unitUpdate'){before=await one(tx,'SELECT * FROM portal_units WHERE id=? FOR UPDATE',id);if(!before)problem('This team or branch was not found.',404);if(before.sample_set)problem('Sample teams are read-only. Add a real team or branch instead.');currentVersion(body,before.version);if(before.area!==area&&await one(tx,'SELECT id FROM portal_records WHERE unit_id=? LIMIT 1',id))problem('The area is fixed once records exist. Create a separate team for the new area.');await run(tx,'UPDATE portal_units SET name=?,area=?,status=?,version=version+1,updated_at=? WHERE id=?',name,area,status,stamp,id)}
    else await run(tx,'INSERT INTO portal_units(id,name,area,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?)',id,name,area,status,v.email,stamp,stamp);
    await event(tx,v,null,body.action,name,before,{id,name,area,status});return {ok:true,id,message:'Team or branch saved.'};
   }
@@ -62,7 +63,7 @@ export async function mutateManagement(db:Database,v:Viewer,body:Row){
    await run(tx,`INSERT INTO portal_records(id,reference,module,title,description,unit_id,area,category,priority,status,owner_email,reviewer_email,due_date,details,license_id,related_id,created_by,updated_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,id,reference,input.module,input.title,input.description,input.unitId,unit.area,input.category,input.priority,MODULES[input.module].initial,input.ownerEmail,input.reviewerEmail,input.dueDate,JSON.stringify(input.details),input.licenseId||null,input.relatedId||null,v.email,v.email,stamp,stamp);
    const created=await record(tx,id);await event(tx,v,id,'created','Created '+reference,null,created);return {ok:true,id,message:reference+' created.'};
   }
-  const id=textValue(body.id,'Record reference',80,true),before=await record(tx,id,true);currentVersion(body,before.version);
+  const id=textValue(body.id,'Record reference',80,true),before=await record(tx,id,true);if(before.sampleSet)problem('Sample records are read-only demonstration scenarios. Use a library control as a template to create operational work.',403);currentVersion(body,before.version);
   if(body.action==='restore'){
    if(!canManage(v.role))problem('An admin must restore archived records.',403);if(!before.archivedAt)problem('This record is already active.');
    await run(tx,'UPDATE portal_records SET archived_at=NULL,version=version+1,updated_by=?,updated_at=? WHERE id=?',v.email,now(),id);
@@ -103,6 +104,7 @@ export async function mutateManagement(db:Database,v:Viewer,body:Row){
 function filters(params:URLSearchParams,allowAll=false){
  const where=['1=1'],values:unknown[]=[];const add=(sql:string,v:unknown)=>{where.push(sql);values.push(v)};
  const module=params.get('module');if(module&&module!=='all')add('p.module=?',parseModule(module));else if(!allowAll)problem('Choose a work area.');
+ const dataset=params.get('dataset')||'all';if(!['all','actual','sample'].includes(dataset))problem('Choose a valid data source.');if(dataset==='actual')where.push('p.sample_set IS NULL');if(dataset==='sample')where.push('p.sample_set IS NOT NULL');
  const area=params.get('area');if(area&&area!=='all'){if(!Object.hasOwn(AREAS,area))problem('Choose a valid area.');add('p.area=?',area)}
  const unit=params.get('unit');if(unit&&unit!=='all')add('p.unit_id=?',textValue(unit,'Team',80));
  const state=params.get('status');if(state&&state!=='all'){if(state==='open')where.push("p.status NOT IN ('closed','retired')");else add('p.status=?',textValue(state,'Status',40))}
@@ -116,16 +118,16 @@ function filters(params:URLSearchParams,allowAll=false){
 export async function readManagement(db:Database,v:Viewer,params:URLSearchParams){
  const kind=params.get('kind')||'bootstrap';
  if(kind==='bootstrap'){
-  const units=(await rows(db,'SELECT id,name,area,status,version FROM portal_units ORDER BY area,name')) as Unit[];
-  return {units,contacts:await contacts(db),permissions:{edit:controlEdit(v.role),review:controlReview(v.role),manage:canManage(v.role)}};
+  const units=(await rows(db,'SELECT id,name,area,status,version,sample_set AS "sampleSet" FROM portal_units ORDER BY area,name')) as Unit[];
+  return {units,contacts:await contacts(db),sampleContacts:SAMPLE_PEOPLE,permissions:{edit:controlEdit(v.role),review:controlReview(v.role),manage:canManage(v.role)}};
  }
  if(kind==='records'||kind==='export'){
   const f=filters(params,true),count=(await one(db,'SELECT COUNT(*) AS n FROM portal_records p WHERE '+f.where,...f.values))!.n;
   if(kind==='export'){
    if(count>10000)problem('Narrow the report filters to export at most 10,000 records.');
    const items=(await rows(db,base+' WHERE '+f.where+' ORDER BY p.module,p.due_date,p.reference LIMIT 10000',...f.values)).map(mapRecord);
-   const header=['Reference','Work area','Title','Area','Team / branch','Category','Priority','Status','Owner','Reviewer','Due / review date','Linked license ID','Related record','Created by','Created at','Updated at','Details'];
-   return {csv:'\uFEFF'+[header,...items.map(r=>[r.reference,MODULES[r.module].name,r.title,AREAS[r.area],r.unitName,r.category,r.priority,r.status,r.ownerEmail,r.reviewerEmail,r.dueDate,r.licenseId,r.relatedReference,r.createdBy,r.createdAt,r.updatedAt,JSON.stringify(r.details)])].map(row=>row.map(csvCell).join(',')).join('\r\n'),count};
+   const header=['Data source','Reference','Work area','Title','Area','Team / branch','Category','Priority','Status','Owner','Reviewer','Due / review date','Linked license ID','Related record','Created by','Created at','Updated at','Details'];
+   return {csv:'\uFEFF'+[header,...items.map(r=>[r.sampleSet?'SAMPLE - fictional':'Actual',r.reference,MODULES[r.module].name,r.title,AREAS[r.area],r.unitName,r.category,r.priority,r.status,r.ownerEmail,r.reviewerEmail,r.dueDate,r.licenseId,r.relatedReference,r.createdBy,r.createdAt,r.updatedAt,JSON.stringify(r.details)])].map(row=>row.map(csvCell).join(',')).join('\r\n'),count};
   }
   const size=20,page=Math.max(1,Math.min(100000,Number(params.get('page'))||1));if(!Number.isInteger(page))problem('Choose a valid page.');
   return {records:(await rows(db,base+' WHERE '+f.where+" ORDER BY CASE p.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,p.due_date,p.reference LIMIT ? OFFSET ?",...f.values,size,(page-1)*size)).map(mapRecord),total:count,page,size};
@@ -137,16 +139,20 @@ export async function readManagement(db:Database,v:Viewer,params:URLSearchParams
  }
  if(kind==='dashboard'||kind==='reports'){
   const f=filters(params,true),where=f.where,values=f.values;
-  const [summary,byModule,byArea,work,review,events,license]=await Promise.all([
-   one(db,`SELECT COUNT(*) AS total,COUNT(*) FILTER(WHERE p.status NOT IN ('closed','retired')) AS open,COUNT(*) FILTER(WHERE p.status NOT IN ('closed','retired') AND p.due_date<?) AS overdue,COUNT(*) FILTER(WHERE p.status NOT IN ('closed','retired') AND p.priority IN ('high','critical')) AS high,COUNT(*) FILTER(WHERE (p.status IN ('submitted','pending_review','implemented','resolved') OR (p.module='control' AND p.status='draft') OR (p.module='risk' AND p.status='treatment'))) AS review,COUNT(*) FILTER(WHERE p.owner_email=? AND p.status NOT IN ('closed','retired')) AS mine,COUNT(*) FILTER(WHERE p.status='closed') AS closed FROM portal_records p WHERE `+where,today(),v.email,...values),
+  const [summary,byModule,byArea,work,review,events,license,byStatus,byPriority,byUnit,health]=await Promise.all([
+   one(db,`SELECT COUNT(*) AS total,COUNT(*) FILTER(WHERE p.sample_set IS NOT NULL) AS sample,COUNT(*) FILTER(WHERE p.status NOT IN ('closed','retired')) AS open,COUNT(*) FILTER(WHERE p.status NOT IN ('closed','retired') AND p.due_date<?) AS overdue,COUNT(*) FILTER(WHERE p.status NOT IN ('closed','retired') AND p.priority IN ('high','critical')) AS high,COUNT(*) FILTER(WHERE (p.status IN ('submitted','pending_review','implemented','resolved') OR (p.module='control' AND p.status='draft') OR (p.module='risk' AND p.status='treatment'))) AS review,COUNT(*) FILTER(WHERE p.owner_email=? AND p.status NOT IN ('closed','retired')) AS mine,COUNT(*) FILTER(WHERE p.status='closed') AS closed FROM portal_records p WHERE `+where,today(),v.email,...values),
    rows(db,"SELECT p.module,COUNT(*) AS total,COUNT(*) FILTER(WHERE p.status NOT IN ('closed','retired')) AS open,COUNT(*) FILTER(WHERE p.status NOT IN ('closed','retired') AND p.due_date<?) AS overdue FROM portal_records p WHERE "+where+' GROUP BY p.module',today(),...values),
    rows(db,"SELECT p.area,COUNT(*) AS total,COUNT(*) FILTER(WHERE p.status NOT IN ('closed','retired')) AS open,COUNT(*) FILTER(WHERE p.status NOT IN ('closed','retired') AND p.due_date<?) AS overdue FROM portal_records p WHERE "+where+' GROUP BY p.area',today(),...values),
    rows(db,base+" WHERE "+where+" AND p.status NOT IN ('closed','retired') ORDER BY CASE WHEN p.owner_email=? THEN 0 ELSE 1 END,p.due_date,p.reference LIMIT 8",...values,v.email),
    rows(db,base+" WHERE "+where+" AND p.reviewer_email=? AND p.created_by<>? AND p.owner_email<>? AND (p.status IN ('submitted','pending_review','implemented','resolved') OR (p.module='control' AND p.status='draft') OR (p.module='risk' AND p.status='treatment')) ORDER BY p.due_date LIMIT 8",...values,v.email,v.email,v.email),
-   rows(db,'SELECT e.id,e.record_id,e.action,e.note,e.actor,e.created_at,p.reference FROM portal_events e LEFT JOIN portal_records p ON p.id=e.record_id ORDER BY e.created_at DESC LIMIT 8'),
-   one(db,"SELECT COUNT(*) AS total,COUNT(*) FILTER(WHERE expiry_date<? AND lower(status) NOT IN ('retired','cancelled','canceled','inactive','suspended')) AS overdue,COUNT(*) FILTER(WHERE expiry_date>=? AND expiry_date<=? AND lower(status) NOT IN ('retired','cancelled','canceled','inactive','suspended')) AS due FROM licenses WHERE archived_at IS NULL",today(),today(),new Date(Date.now()+60*86400000).toISOString().slice(0,10))
+   rows(db,'SELECT e.id,e.record_id,e.action,e.note,e.actor,e.created_at,p.reference FROM portal_events e JOIN portal_records p ON p.id=e.record_id WHERE '+where+' ORDER BY e.created_at DESC,e.id DESC LIMIT 8',...values),
+   one(db,"SELECT COUNT(*) AS total,COUNT(*) FILTER(WHERE expiry_date<? AND lower(status) NOT IN ('retired','cancelled','canceled','inactive','suspended')) AS overdue,COUNT(*) FILTER(WHERE expiry_date>=? AND expiry_date<=? AND lower(status) NOT IN ('retired','cancelled','canceled','inactive','suspended')) AS due FROM licenses WHERE archived_at IS NULL",today(),today(),new Date(Date.now()+60*86400000).toISOString().slice(0,10)),
+   rows(db,'SELECT p.status,COUNT(*) AS total FROM portal_records p WHERE '+where+' GROUP BY p.status ORDER BY total DESC,p.status',...values),
+   rows(db,'SELECT p.priority,COUNT(*) AS total FROM portal_records p WHERE '+where+' GROUP BY p.priority',...values),
+   rows(db,"SELECT u.name,COUNT(*) AS total,COUNT(*) FILTER(WHERE p.status='closed') AS closed,COUNT(*) FILTER(WHERE p.status NOT IN ('closed','retired') AND p.due_date<?) AS overdue FROM portal_records p JOIN portal_units u ON u.id=p.unit_id WHERE "+where+' GROUP BY u.id,u.name ORDER BY total DESC,u.name',today(),...values),
+   one(db,`SELECT COUNT(*) FILTER(WHERE p.module='control') AS controls,COUNT(*) FILTER(WHERE p.module='control' AND p.status='active') AS active_controls,COUNT(*) FILTER(WHERE p.module='check') AS checks,COUNT(*) FILTER(WHERE p.module='check' AND p.status IN ('pending_review','closed') AND p.details->>'result' IN ('Effective','Partly effective','Ineffective')) AS tested,COUNT(*) FILTER(WHERE p.module='check' AND p.status IN ('pending_review','closed') AND p.details->>'result'='Effective') AS effective,COUNT(*) FILTER(WHERE p.module='check' AND p.status IN ('pending_review','closed') AND p.details->>'result'='Partly effective') AS partial,COUNT(*) FILTER(WHERE p.module='check' AND p.status IN ('pending_review','closed') AND p.details->>'result'='Ineffective') AS ineffective,COUNT(*) FILTER(WHERE p.module='finding' AND p.status<>'closed') AS findings,COUNT(*) FILTER(WHERE p.module='action' AND p.status<>'closed' AND p.due_date<?) AS overdue_actions FROM portal_records p WHERE `+where,today(),...values)
   ]);
-  return {summary,byModule,byArea,work:work.map(mapRecord),review:review.map(mapRecord),events:events.map(eventMap),licenses:license,today:today()};
+  return {summary,byModule,byArea,byStatus,byPriority,byUnit,health,work:work.map(mapRecord),review:review.map(mapRecord),events:events.map(eventMap),licenses:license,today:today()};
  }
  problem('This view is not available.');
 }
@@ -163,7 +169,7 @@ export function validateEvidence(name:string,bytes:Buffer){
 export async function addEvidence(db:Database,v:Viewer,body:Row,bytes:Buffer){
  writeAccess(v);const file=validateEvidence(textValue(body.name,'File name',200,true),bytes);
  return mutateOnce(db,v,{...body,action:'evidence',sha256:file.sha256},async tx=>{
-  const r=await record(tx,textValue(body.id,'Record',80,true),true);currentVersion(body,r.version);if(r.archivedAt||terminal(r.status))problem('Reopen or restore the record before attaching new evidence.');
+  const r=await record(tx,textValue(body.id,'Record',80,true),true);if(r.sampleSet)problem('Sample evidence is read-only. Attach actual evidence to an operational record.',403);currentVersion(body,r.version);if(r.archivedAt||terminal(r.status))problem('Reopen or restore the record before attaching new evidence.');
   await one(tx,"SELECT pg_advisory_xact_lock(hashtextextended('icdd-evidence-capacity',0))");
   const usage=(await one(tx,'SELECT COALESCE(SUM(size),0) AS size,COUNT(*) FILTER(WHERE record_id=?) AS count FROM portal_evidence',r.id))!;
   if(usage.count>=20)problem('This record has reached its limit of 20 evidence files.');if(Number(usage.size)+bytes.length>200*1024*1024)problem('Evidence storage has reached its 200 MB limit. Ask the workspace owner to review storage.');

@@ -4,7 +4,7 @@ The existing license tracker is now one module in the private management portal.
 
 ## Start using the portal
 
-1. Under **Teams & branches**, add the actual IT teams, head office departments and branches. No sample business records or branch names are installed in production.
+1. Under **Teams & branches**, add the actual IT teams, head office departments and branches. The portal also includes clearly labelled sample teams and records. Add real teams for operational work.
 2. Under **Users & access**, add the people who will own work. Add at least one independent **Control reviewer** or admin, different from the creator and accountable owner of the work they review.
 3. Add controls to the library. A reviewer activates each control. Use **Linked → Run a control check** to create a check against an active control.
 4. Create changes, exceptions, findings, actions, risks and incidents as needed. Give every record an owner, team, priority and due or review date. Link follow-up actions to the source record and, where relevant, to a license or asset.
@@ -60,3 +60,14 @@ Production: Neon project `red-mud-64374274`, branch `br-ancient-wildflower-b9usr
 Development tests: branch `br-delicate-morning-b9h02lqb`. Synthetic test records are archived there after the run; test people and teams are suspended/inactivated. They are never inserted into production.
 
 The existing Render URL stays in place so saved links and the renewal worker keep working. Source is under `renewal-app/` on branch `icdd-license-renewal-tracker` in the existing repository. Credentials remain in private platform settings.
+
+
+## Control libraries and populated dashboards
+
+The three selectable areas are **IT Control**, **Head Office Control** and **Branch Control**. Each has a separate dashboard and 24 original starter control procedures. The selected area persists when opening changes, exceptions, controls/checks, findings/actions, risks/incidents and reports. Each register has its own filtered metrics, status chart and severity chart. Dashboards also show control-test outcomes and team/branch progress. These are reporting scopes, not access boundaries.
+
+The additive `0004_control_libraries_sample_data` migration adds nullable sample-set markers. The isolated database tests verify the idempotent `icdd-demo-2027-v1` sample set. Load production samples only after the new version is live, using `scripts/seed-sample.ts` or the equivalent transactional data load. It adds 12 sample teams, 72 control definitions, 72 checks, 36 findings, 36 actions, 18 exceptions, 12 changes, 18 risks, 12 incidents and 276 small, explicitly fictional evidence notes. It creates no workspace users, signs no one in, changes no licences and queues no email.
+
+Use **Data source → Actual records only** to exclude every sample record from dashboard counts, lists, history and exports. **Sample records only** demonstrates the full portal. CSV exports include a Data source column. References starting `DEMO-`, sample badges, fictional team names and the record notice identify demonstrations. Sample progress and closure states are simulations; they do not represent real approval or assurance. Sample history is recorded as `sample_loaded` rather than fabricated operational decisions.
+
+Sample scenarios and teams are read-only through the application. To start real work, open a sample library control and choose **Use as a new control**. Select a real team, assign actual workspace users, confirm the procedure and submit the new draft for independent activation. Actual checks and follow-ups cannot link to sample controls. Real findings and evidence keep their existing independent-review workflow. Framework references identify related topics and do not establish conformity or certification.
