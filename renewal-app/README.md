@@ -1,7 +1,4 @@
-# ICDD Management Portal
-
-The ICDD Management Portal combines internal control work across IT, head office and branches with the existing license and renewal register. It adds change approvals, exceptions, a control library and checks, findings, action plans, risks, incidents, private evidence and management reporting. See [the portal guide](docs/MANAGEMENT-PORTAL.md) for setup, workflows, access and operational limits.
-
+# ICDD License Renewal Tracker
 
 Private software, hardware and service renewal tracking on Render with a Neon PostgreSQL database.
 
@@ -11,7 +8,7 @@ Private software, hardware and service renewal tracking on Render with a Neon Po
 - A searchable register, renewal calendar, Ghana cedi amounts, archived records and full renewal history.
 - Reminder emails beginning **two calendar months before expiry**, with optional day-based follow-ups and overdue repeats. Month-end dates clamp to the last valid day, so 30 April 2027 starts on 28 February 2027.
 - Separate logs for provider acceptance, failure, retries and requests needing review. Acceptance is not a claim of inbox delivery.
-- Passwordless email-code sign-in, with owner, admin, editor, control reviewer and view-only roles. Admins add or suspend people in **Users & access**.
+- Passwordless email-code sign-in, with owner, admin, editor and view-only roles. Admins add or suspend people in **Users & access**.
 
 ## Email setup
 
