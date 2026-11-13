@@ -232,7 +232,7 @@ async function summary(db, context) {
     hasSales ? first(db,"WITH current_sales AS ("+salesSummary+") SELECT COALESCE(sum(total_minor) FILTER(WHERE sold_on >= $3 AND voided_at IS NULL),0) sales, COALESCE(sum(balance_minor),0) outstanding, COALESCE(sum(pending_minor),0) pending, (SELECT COALESCE(sum(amount_minor),0) FROM payments WHERE workspace_id=$1 AND status='settled' AND settled_on >= $3) collected, (SELECT COALESCE(sum(amount_minor),0) FROM expenses WHERE workspace_id=$1 AND voided_at IS NULL AND paid_on >= $3) expenses FROM current_sales",[ws,today,start]) : null,
     db.query('SELECT m.reference,m.kind,m.delta,m.effective_on,m.created_at,p.name,p.sku FROM movements m JOIN products p ON p.workspace_id=m.workspace_id AND p.id=m.product_id WHERE m.workspace_id=$1 ORDER BY m.created_at DESC,m.id LIMIT 7',[ws]),
     hasSales ? db.query('SELECT method,count(*)::int transactions,sum(total_minor) amount FROM sales WHERE workspace_id=$1 AND sold_on>=$2 AND voided_at IS NULL GROUP BY method',[ws,start]) : null,
-    hasSales ? db.query("SELECT d::date day,COALESCE(sum(s.total_minor),0) amount FROM generate_series(($2::date-6)::timestamp,$2::date::timestamp,interval '1 day') d LEFT JOIN sales s ON s.workspace_id=$1 AND s.sold_on=d::date AND s.voided_at IS NULL GROUP BY d ORDER BY d",[ws,today]) : null
+    hasSales ? db.query("SELECT d::date AS day,COALESCE(sum(s.total_minor),0) amount FROM generate_series(($2::date-6)::timestamp,$2::date::timestamp,interval '1 day') d LEFT JOIN sales s ON s.workspace_id=$1 AND s.sold_on=d::date AND s.voided_at IS NULL GROUP BY d ORDER BY d",[ws,today]) : null
   ]);
   if (finance && !can(context,'finance')) delete finance.expenses;
   if (!can(context,'finance') && !can(context,'stock')) delete stock.stock_value;
