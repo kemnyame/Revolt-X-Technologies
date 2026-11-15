@@ -2,19 +2,28 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { audit, dateInZone, fail, first, id, transaction } from './db.mjs';
 import { currency, effectiveDate, email, integer, isoDate, label, minor, optional, paymentMethod, paymentReference, positiveMinor, quantity, role, timezone, totalOf, uuid, why } from './validation.mjs';
+import { registerReports } from './reports.mjs';
 
+const packSize = z.number().int().min(2).max(1000).nullish();
+const packFields = {unitsPerBox:packSize, boxesPerCarton:packSize};
 const productForm = z.object({
   sku: label(48).transform(v => v.toUpperCase()), name: label(), category: label(80), unit: label(24),
-  location: label(60), reorderPoint: integer, costMinor: minor, priceMinor: minor
+  location: label(60), reorderPoint: integer, costMinor: minor, priceMinor: minor, ...packFields
+});
+const packCount = z.number().int().min(0).max(1000000);
+const stockLine = z.object({
+  productId: uuid, quantity: packCount,
+  boxes: packCount.default(0), cartons: packCount.default(0),
+  pack: z.object(packFields).optional()
 });
 const receiptForm = z.object({
   supplier: label(), shipment: optional(), date: isoDate, notes: optional(500),
-  lines: z.array(z.object({productId: uuid, quantity, costMinor: minor})).min(1).max(40)
+  lines: z.array(stockLine.extend({costMinor: minor})).min(1).max(40)
 });
 const saleForm = z.object({
   customer: label(), date: isoDate, dueOn: isoDate.nullish(), method: z.enum(['cash','credit','cheque','momo']),
   reference: optional(), notes: optional(500),
-  lines: z.array(z.object({productId: uuid, quantity, priceMinor: positiveMinor})).min(1).max(40)
+  lines: z.array(stockLine.extend({priceMinor: positiveMinor})).min(1).max(40)
 });
 const paymentForm = z.object({date: isoDate, method: paymentMethod, amountMinor: positiveMinor, reference: optional()});
 const expenseForm = z.object({
@@ -22,7 +31,11 @@ const expenseForm = z.object({
   method: z.enum(['cash','cheque','momo','transfer']), amountMinor: positiveMinor, reference: optional()
 });
 const adjustForm = z.object({delta: z.number().int().min(-1000000).max(1000000).refine(n => n !== 0,'Enter a non-zero stock change.'), reason: label(240)});
-const businessForm = z.object({name: label(), currency, timezone});
+const businessForm = z.object({
+  name: label(), currency, timezone,
+  receiptAddress: z.string().trim().max(250).optional(),
+  receiptPhone: z.string().trim().max(48).optional()
+});
 const documentRef = (prefix, docId) => prefix + '-' + docId.replaceAll('-','').slice(0,12).toUpperCase();
 
 export const abilities = {
@@ -60,6 +73,29 @@ async function lockProducts(db, context, lines, includeArchived = false) {
   return new Map(rows.map(row => [row.id,row]));
 }
 
+function productPacking(item, previous = {}) {
+  const unitsPerBox = item.unitsPerBox === undefined ? previous.units_per_box ?? null : item.unitsPerBox;
+  const boxesPerCarton = item.boxesPerCarton === undefined ? previous.boxes_per_carton ?? null : item.boxesPerCarton;
+  if (boxesPerCarton && !unitsPerBox) fail(400,'Set the units per box before adding boxes per carton.');
+  return [unitsPerBox,boxesPerCarton];
+}
+
+function unpackLines(lines, products) {
+  return lines.map(line => {
+    const product = products.get(line.productId);
+    const {units_per_box: unitsPerBox, boxes_per_carton: boxesPerCarton} = product;
+    if (line.pack && ((line.pack.unitsPerBox ?? null) !== unitsPerBox || (line.pack.boxesPerCarton ?? null) !== boxesPerCarton)) {
+      fail(409,product.name + ' has a new pack size. Reopen the form and select it again.');
+    }
+    if ((line.boxes && !unitsPerBox) || (line.cartons && !boxesPerCarton)) {
+      fail(400,'A pack size is missing for ' + product.name + '.');
+    }
+    const units = line.quantity + line.boxes * (unitsPerBox || 0) + line.cartons * (boxesPerCarton || 0) * (unitsPerBox || 0);
+    if (!quantity.safeParse(units).success) fail(400,'Enter between 1 and 1,000,000 total units for ' + product.name + '.');
+    return {...line, quantity:units, unitsPerBox, boxesPerCarton};
+  });
+}
+
 async function move(db, context, product, delta, document, effectiveOn, kind) {
   const next = product.quantity + delta;
   if (next < 0) fail(409,product.name + ' has only ' + product.quantity + ' ' + product.unit + ' available.');
@@ -71,20 +107,22 @@ async function move(db, context, product, delta, document, effectiveOn, kind) {
 
 export async function createProduct(db, context, data) {
   const item = productForm.parse(data);
+  const packing = productPacking(item);
   const productId = id();
-  await db.query('INSERT INTO products(id,workspace_id,sku,name,category,unit,location,reorder_point,cost_minor,price_minor) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
-    [productId,context.workspace_id,item.sku,item.name,item.category,item.unit,item.location,item.reorderPoint,item.costMinor,item.priceMinor]);
+  await db.query('INSERT INTO products(id,workspace_id,sku,name,category,unit,location,reorder_point,cost_minor,price_minor,units_per_box,boxes_per_carton) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
+    [productId,context.workspace_id,item.sku,item.name,item.category,item.unit,item.location,item.reorderPoint,item.costMinor,item.priceMinor,...packing]);
   await audit(db,context,'Product created',item.sku,item.name);
   return {id:productId};
 }
 
 async function updateProduct(db, context, productId, data) {
   const item = productForm.extend({archived:z.boolean()}).parse(data);
-  const current = await first(db,'SELECT quantity FROM products WHERE workspace_id=$1 AND id=$2 FOR UPDATE',[context.workspace_id,productId]);
+  const current = await first(db,'SELECT quantity,units_per_box,boxes_per_carton FROM products WHERE workspace_id=$1 AND id=$2 FOR UPDATE',[context.workspace_id,productId]);
   if (!current) fail(404,'Product not found.');
   if (item.archived && current.quantity > 0) fail(409,'Move remaining stock out before archiving this product.');
-  await db.query('UPDATE products SET sku=$3,name=$4,category=$5,unit=$6,location=$7,reorder_point=$8,cost_minor=$9,price_minor=$10,archived=$11 WHERE workspace_id=$1 AND id=$2',
-    [context.workspace_id,productId,item.sku,item.name,item.category,item.unit,item.location,item.reorderPoint,item.costMinor,item.priceMinor,item.archived]);
+  const packing = productPacking(item,current);
+  await db.query('UPDATE products SET sku=$3,name=$4,category=$5,unit=$6,location=$7,reorder_point=$8,cost_minor=$9,price_minor=$10,archived=$11,units_per_box=$12,boxes_per_carton=$13 WHERE workspace_id=$1 AND id=$2',
+    [context.workspace_id,productId,item.sku,item.name,item.category,item.unit,item.location,item.reorderPoint,item.costMinor,item.priceMinor,item.archived,...packing]);
   await audit(db,context,item.archived?'Product archived':'Product updated',item.sku,item.name);
   return {id:productId};
 }
@@ -93,13 +131,14 @@ export async function receiveStock(db, context, data) {
   const body = receiptForm.parse(data);
   const date = effectiveDate(body.date,context);
   const products = await lockProducts(db,context,body.lines);
+  const lines = unpackLines(body.lines,products);
   const receiptId = id(), reference = documentRef('IN',receiptId);
   await db.query('INSERT INTO inbound(id,workspace_id,reference,supplier,shipment,received_on,notes,total_minor) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
-    [receiptId,context.workspace_id,reference,body.supplier,body.shipment,date,body.notes,totalOf(body.lines,'costMinor')]);
-  for (const line of body.lines) {
+    [receiptId,context.workspace_id,reference,body.supplier,body.shipment,date,body.notes,totalOf(lines,'costMinor')]);
+  for (const line of lines) {
     const product=products.get(line.productId);
-    await db.query('INSERT INTO inbound_lines(workspace_id,receipt_id,product_id,quantity,cost_minor,sku,name,unit) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
-      [context.workspace_id,receiptId,line.productId,line.quantity,line.costMinor,product.sku,product.name,product.unit]);
+    await db.query('INSERT INTO inbound_lines(workspace_id,receipt_id,product_id,quantity,cost_minor,sku,name,unit,units_per_box,boxes_per_carton) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+      [context.workspace_id,receiptId,line.productId,line.quantity,line.costMinor,product.sku,product.name,product.unit,line.unitsPerBox,line.boxesPerCarton]);
     await move(db,context,product,line.quantity,{id:receiptId,reference},date,'inbound');
   }
   await audit(db,context,'Stock received',reference,body.supplier);
@@ -112,16 +151,17 @@ export async function createSale(db, context, data) {
   const dueOn = body.method === 'credit' ? body.dueOn : null;
   if (body.method === 'credit' && !dueOn) fail(400,'Enter a due date for this credit sale.');
   if (dueOn && dueOn < date) fail(400,'The due date must be on or after the sale date.');
-  const total = totalOf(body.lines,'priceMinor');
   const referenceNumber = body.method === 'credit' ? null : paymentReference(body.method,body.reference);
   const products = await lockProducts(db,context,body.lines);
+  const lines = unpackLines(body.lines,products);
+  const total = totalOf(lines,'priceMinor');
   const saleId = id(), reference = documentRef('SL',saleId);
   await db.query('INSERT INTO sales(id,workspace_id,reference,customer,sold_on,due_on,method,total_minor,notes) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',
     [saleId,context.workspace_id,reference,body.customer,date,dueOn,body.method,total,body.notes]);
-  for (const line of body.lines) {
+  for (const line of lines) {
     const product=products.get(line.productId);
-    await db.query('INSERT INTO sale_lines(workspace_id,sale_id,product_id,quantity,price_minor,sku,name,unit) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
-      [context.workspace_id,saleId,line.productId,line.quantity,line.priceMinor,product.sku,product.name,product.unit]);
+    await db.query('INSERT INTO sale_lines(workspace_id,sale_id,product_id,quantity,price_minor,sku,name,unit,units_per_box,boxes_per_carton) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+      [context.workspace_id,saleId,line.productId,line.quantity,line.priceMinor,product.sku,product.name,product.unit,line.unitsPerBox,line.boxesPerCarton]);
     await move(db,context,product,-line.quantity,{id:saleId,reference},date,'sale');
   }
   if (body.method !== 'credit') await insertPayment(db,context,saleId,total,body.method,referenceNumber,date);
@@ -142,7 +182,7 @@ async function getDocument(db, context, table, recordId, lock = false) {
   return row;
 }
 
-async function recordPayment(db, context, saleId, data) {
+export async function recordPayment(db, context, saleId, data) {
   const body = paymentForm.parse(data);
   const date = effectiveDate(body.date,context);
   const reference = paymentReference(body.method,body.reference);
@@ -157,7 +197,7 @@ async function recordPayment(db, context, saleId, data) {
   return {id:paymentId,reference:sale.reference};
 }
 
-async function settleCheque(db, context, saleId, paymentId, data) {
+export async function settleCheque(db, context, saleId, paymentId, data) {
   const body = z.object({action:z.enum(['clear','reject']),date:isoDate,reason:optional(240)}).parse(data);
   const date = effectiveDate(body.date,context);
   const sale = await getDocument(db,context,'sales',saleId,true);
@@ -247,8 +287,8 @@ const datasets = {
   inventory:{
     table:'products', filter:"($3='' OR ($3='low' AND quantity<=reorder_point AND NOT archived) OR ($3='active' AND NOT archived) OR ($3='archived' AND archived))",
     search:"concat_ws(' ',sku,name,category,location)", order:'archived,name,sku',
-    fields:'id,sku,name,category,unit,location,quantity,reorder_point,cost_minor,price_minor,archived',
-    export:['sku','name','category','unit','location','quantity','reorder_point','cost_minor','price_minor','archived']
+    fields:'id,sku,name,category,unit,location,quantity,reorder_point,cost_minor,price_minor,archived,units_per_box,boxes_per_carton',
+    export:['sku','name','category','unit','location','quantity','units_per_box','boxes_per_carton','reorder_point','cost_minor','price_minor','archived']
   },
   inbound:{
     table:'inbound', filter:"($3='' OR ($3='posted' AND voided_at IS NULL) OR ($3='reversed' AND voided_at IS NOT NULL))",
@@ -283,6 +323,7 @@ function csvEscape(value) {
   if (/^[\s]*[=+@-]/.test(cell) && !/^-?\d+(\.\d+)?$/.test(cell)) cell = "'"+cell;
   return '"' + cell.replaceAll('"','""') + '"';
 }
+const toCsv = rows => '\ufeff'+rows.map(row=>row.map(csvEscape).join(',')).join('\r\n');
 async function list(db, context, dataset, query, exportRows) {
   const q = listQuery.parse(query), cfg = datasets[dataset];
   const params = [context.workspace_id,q.q,q.filter];
@@ -303,7 +344,7 @@ async function list(db, context, dataset, query, exportRows) {
     delete row.total_count;
     if (hideCost) delete row.cost_minor;
   }
-  if (exportRows) return '\ufeff'+[columns.map(c=>c.replace(/_minor$/,'').replaceAll('_',' ')),...rows.map(row=>columns.map(c=>c.endsWith('_minor')?(Number(row[c])/100).toFixed(2):row[c]))].map(r=>r.map(csvEscape).join(',')).join('\r\n');
+  if (exportRows) return toCsv([columns.map(c=>c.replace(/_minor$/,'').replaceAll('_',' ')),...rows.map(row=>columns.map(c=>c.endsWith('_minor')?(Number(row[c])/100).toFixed(2):row[c]))]);
   return {rows,total,page:q.page,pageSize:25};
 }
 
@@ -314,7 +355,10 @@ async function detail(db, context, table, recordId) {
   if (!row) fail(404,'Document not found.');
   const tableName=isSale?'sale_lines':'inbound_lines',link=isSale?'sale_id':'receipt_id';
   row.lines=(await db.query('SELECT * FROM '+tableName+' WHERE workspace_id=$1 AND '+link+'=$2 ORDER BY name',[ws,recordId])).rows;
-  if(isSale) row.payments=(await db.query('SELECT * FROM payments WHERE workspace_id=$1 AND sale_id=$2 ORDER BY created_at,id',[ws,recordId])).rows;
+  if(isSale) {
+    row.payments=(await db.query('SELECT * FROM payments WHERE workspace_id=$1 AND sale_id=$2 ORDER BY created_at,id',[ws,recordId])).rows
+      .map(payment => ({...payment,receipt_number:documentRef('PAY',payment.id)}));
+  }
   return row;
 }
 
@@ -338,6 +382,7 @@ export function registerOperations(app, db, { access, inviteMember, refreshInvit
     return result.inviteId?{id:result.id,invitationUrl:invitationUrl(result.inviteId)}:result;
   }});
   const getId = req => uuid.parse(req.params.id);
+  registerReports(db,{read,write,can,toCsv});
   read('/api/dashboard',['inventory'],c=>summary(db,c));
   const accessByDataset = {inventory:['inventory'],inbound:['stock'],sales:['sales','salesRead'],expenses:['finance'],movements:['stock','finance'],audit:['audit'],users:['users']};
   for (const [name,permissions] of Object.entries(accessByDataset)) {
@@ -349,7 +394,7 @@ export function registerOperations(app, db, { access, inviteMember, refreshInvit
   }
   read('/api/products/options',['stock','sales'],async (c,req)=>{
     const q=z.object({q:z.string().trim().max(120).default(''),id:uuid.optional()}).parse(req.query);
-    const {rows}=await db.query("SELECT id,sku,name,quantity,unit,cost_minor,price_minor FROM products WHERE workspace_id=$1 AND NOT archived AND ($3::uuid IS NULL OR id=$3) AND concat_ws(' ',sku,name) ILIKE '%'||$2||'%' ORDER BY name,sku LIMIT 100",[c.workspace_id,q.q,q.id??null]);
+    const {rows}=await db.query("SELECT id,sku,name,quantity,unit,cost_minor,price_minor,units_per_box,boxes_per_carton FROM products WHERE workspace_id=$1 AND NOT archived AND ($3::uuid IS NULL OR id=$3) AND concat_ws(' ',sku,name) ILIKE '%'||$2||'%' ORDER BY name,sku LIMIT 100",[c.workspace_id,q.q,q.id??null]);
     if(!can(c,'stock'))for(const row of rows)delete row.cost_minor;
     return rows;
   });
@@ -374,7 +419,9 @@ export function registerOperations(app, db, { access, inviteMember, refreshInvit
       const used=await first(d,'SELECT (EXISTS(SELECT 1 FROM products WHERE workspace_id=$1) OR EXISTS(SELECT 1 FROM expenses WHERE workspace_id=$1)) used',[c.workspace_id]);
       if(used.used)fail(409,'The currency can be changed before recording products or expenses.');
     }
-    await d.query('UPDATE workspaces SET name=$2,currency=$3,timezone=$4 WHERE id=$1',[c.workspace_id,form.name,form.currency,form.timezone]);
+    await d.query('UPDATE workspaces SET name=$2,currency=$3,timezone=$4,receipt_address=$5,receipt_phone=$6 WHERE id=$1',
+      [c.workspace_id,form.name,form.currency,form.timezone,form.receiptAddress===undefined?c.receipt_address:form.receiptAddress||null,
+        form.receiptPhone===undefined?c.receipt_phone:form.receiptPhone||null]);
     await audit(d,c,'Workspace settings updated',c.slug,form.name);
     return {updated:true};
   });

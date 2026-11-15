@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test test/*.test.mjs",
-    "check": "node --check public/app.js && node --check server.mjs"
+    "check": "node --check public/app.js && node --check public/reports-ui.js && node --check server.mjs && node --check reports.mjs"
   },
   "dependencies": {
     "fastify": "5.12.7",

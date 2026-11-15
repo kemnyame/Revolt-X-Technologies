@@ -18,12 +18,14 @@ jobs:
           const assert = require('node:assert/strict');
           const { setTimeout: delay } = require('node:timers/promises');
           const { chromium } = require('playwright-core');
-          const origin = 'https://revolt-x-warehouse.onrender.com';
+          const origin = process.env.WAREHOUSE_TEST_URL || 'https://revolt-x-warehouse.onrender.com';
+          const release = process.env.WAREHOUSE_TEST_URL ? null : process.env.GITHUB_SHA;
 
           async function waitForService() {
-            for (let attempt = 0; attempt < 10; attempt++) {
+            for (let attempt = 0; attempt < 25; attempt++) {
               const response = await fetch(origin + '/health', { signal: AbortSignal.timeout(25000) }).catch(() => null);
-              if (response?.ok && (await response.json().catch(() => null))?.status === 'ready') return;
+              if (response?.ok && (!release || response.headers.get('x-warehouse-release') === release) &&
+                  (await response.json().catch(() => null))?.status === 'ready') return;
               await delay(5000);
             }
             throw new Error('The hosted health check did not become ready.');
@@ -31,21 +33,28 @@ jobs:
 
           async function verify() {
             await waitForService();
-            const browser = await chromium.launch({ channel: 'chrome' });
+            const browser = await chromium.launch(process.env.WAREHOUSE_BROWSER_EXECUTABLE
+              ? { executablePath: process.env.WAREHOUSE_BROWSER_EXECUTABLE } : { channel: 'chrome' });
             try {
               const page = await browser.newPage();
               const errors = [];
               page.on('pageerror', error => errors.push(error.message));
+              await page.addInitScript(() => {
+                window.print = () => { window.warehousePrinted = document.querySelector('dialog h2').textContent; };
+              });
               const heading = name => page.getByRole('heading', { name, exact: true });
               const button = name => page.getByRole('button', { name, exact: true });
+              const nav = name => page.getByRole('navigation', { name: 'Warehouse navigation' }).getByRole('button', { name, exact: true });
               async function json(path) {
                 const response = await page.request.get(origin + path);
                 assert.ok(response.ok(), path + ' returned ' + response.status());
                 return response.json();
               }
               async function quantity() {
-                const inventory = await json('/api/inventory?q=EL-1001');
+                const inventory = await json('/api/inventory?q=FR-1001');
                 assert.equal(inventory.total, 1);
+                assert.equal(inventory.rows[0].units_per_box, 12);
+                assert.equal(inventory.rows[0].boxes_per_carton, 6);
                 return Number(inventory.rows[0].quantity);
               }
               async function postDocument(path, label, dialog) {
@@ -65,7 +74,7 @@ jobs:
                 ['Available stock', 'inventory', 16], ['Inbound stock', 'inbound', 3], ['Sales', 'sales', 8],
                 ['Expenses', 'expenses', 6], ['Users & access', 'users', 5]
               ]) {
-                await button(label).click();
+                await nav(label).click();
                 await heading(label).waitFor();
                 assert.equal((await json('/api/' + route)).total, total, label);
               }
@@ -73,26 +82,57 @@ jobs:
               const openingQuantity = await quantity();
               const dialog = page.getByRole('dialog');
               const product = dialog.getByRole('combobox', { name: 'Product', exact: true });
-              await button('Inbound stock').click();
+              await nav('Inbound stock').click();
               await button('Receive stock').click();
               await dialog.getByLabel('Supplier', { exact: true }).fill('Demo release verification');
-              const productId = await product.locator('option').filter({ hasText: 'EL-1001' }).getAttribute('value');
+              const productId = await product.locator('option').filter({ hasText: 'FR-1001' }).getAttribute('value');
               assert.ok(productId);
               await product.selectOption(productId);
-              await dialog.getByLabel('Quantity', { exact: true }).fill('3');
+              await dialog.getByLabel('Cartons', { exact: true }).fill('1');
+              await dialog.getByLabel('Boxes', { exact: true }).fill('1');
+              await dialog.getByLabel('Units', { exact: true }).fill('3');
               await postDocument('/api/inbound', 'Post receipt', dialog);
-              assert.equal(await quantity(), openingQuantity + 3);
+              await dialog.getByRole('heading', { name: /Goods received receipt/ }).waitFor();
+              assert.equal(await quantity(), openingQuantity + 87);
+              await dialog.getByRole('button', { name: 'Print / Save PDF', exact: true }).click();
+              assert.match(await page.evaluate(() => window.warehousePrinted), /Goods received receipt/);
+              await dialog.getByRole('button', { name: 'Close', exact: true }).click();
 
-              await button('Sales').click();
+              await nav('Sales').click();
               await button('New sale').click();
               await dialog.getByLabel('Customer', { exact: true }).fill('Demo release verification');
               await product.selectOption(productId);
+              await dialog.getByLabel('Boxes', { exact: true }).fill('1');
               await postDocument('/api/sales', 'Post sale', dialog);
-              assert.equal(await quantity(), openingQuantity + 2);
+              await dialog.getByRole('heading', { name: /Sales receipt/ }).waitFor();
+              assert.equal(await quantity(), openingQuantity + 75);
+              await dialog.getByRole('button', { name: 'Payment receipt', exact: true }).click();
+              await dialog.getByRole('heading', { name: /Payment receipt PAY-/ }).waitFor();
+              await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+
+              await nav('Reports').click();
+              await heading('Inventory on hand').waitFor();
+              await page.getByRole('combobox', { name: 'Report', exact: true }).selectOption('sales-product');
+              await heading('Sales by product').waitFor();
+              const [download] = await Promise.all([page.waitForEvent('download'), button('Export CSV').click()]);
+              assert.equal(download.suggestedFilename(), 'warehouse-sales-product.csv');
+
+              await nav('End of day').click();
+              await heading('End of day').waitFor();
+              const { report } = await json('/api/end-of-day');
+              await button('Record cash count').click();
+              await dialog.getByLabel('Opening cash', { exact: true }).fill('50.00');
+              await dialog.getByLabel('Counted cash', { exact: true }).fill(((5000 + Number(report.netCash)) / 100).toFixed(2));
+              await postDocument('/api/end-of-day/reconcile', 'Save cash count', dialog);
+              await button('View count').click();
+              await dialog.getByRole('heading', { name: 'Saved end-of-day cash count', exact: true }).waitFor();
+              await dialog.getByRole('button', { name: 'Print / Save PDF', exact: true }).click();
+              assert.match(await page.evaluate(() => window.warehousePrinted), /Saved end-of-day cash count/);
+              await dialog.getByRole('button', { name: 'Close', exact: true }).click();
               await button('Sign out').click();
               await heading('Sign in').waitFor();
               assert.deepEqual(errors, []);
-              console.log('Hosted sign-in page, demo, stock receipt, cash sale, and sign-out passed.');
+              console.log('Cosmetics demo, carton conversion, receipts, CSV, and daily cash count passed.');
             } finally {
               await browser.close();
             }

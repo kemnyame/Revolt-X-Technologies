@@ -182,3 +182,31 @@ CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS invites_member ON invites(workspace_id,member_id);
 CREATE INDEX IF NOT EXISTS invites_expiry ON invites(expires_at);
 CREATE INDEX IF NOT EXISTS auth_limits_expiry ON auth_limits(expires_at);
+
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS receipt_address text;
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS receipt_phone text;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS units_per_box integer CHECK (units_per_box BETWEEN 2 AND 1000);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS boxes_per_carton integer
+  CHECK (boxes_per_carton IS NULL OR (boxes_per_carton BETWEEN 2 AND 1000 AND units_per_box IS NOT NULL));
+ALTER TABLE inbound_lines ADD COLUMN IF NOT EXISTS units_per_box integer;
+ALTER TABLE inbound_lines ADD COLUMN IF NOT EXISTS boxes_per_carton integer;
+ALTER TABLE sale_lines ADD COLUMN IF NOT EXISTS units_per_box integer;
+ALTER TABLE sale_lines ADD COLUMN IF NOT EXISTS boxes_per_carton integer;
+
+CREATE TABLE IF NOT EXISTS daily_reconciliations (
+  id uuid PRIMARY KEY,
+  workspace_id uuid NOT NULL REFERENCES workspaces ON DELETE CASCADE,
+  business_date date NOT NULL,
+  opening_minor bigint NOT NULL CHECK (opening_minor >= 0),
+  counted_minor bigint NOT NULL CHECK (counted_minor >= 0),
+  expected_minor numeric NOT NULL,
+  variance_minor numeric NOT NULL,
+  notes text,
+  snapshot jsonb NOT NULL,
+  recorded_by text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS daily_reconciliations_date ON daily_reconciliations(workspace_id,business_date,created_at DESC);
+CREATE INDEX IF NOT EXISTS movements_effective_date ON movements(workspace_id,effective_on);
+CREATE INDEX IF NOT EXISTS payments_settled_date ON payments(workspace_id,settled_on);
+CREATE INDEX IF NOT EXISTS payments_received_date ON payments(workspace_id,received_on);

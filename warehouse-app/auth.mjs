@@ -74,7 +74,7 @@ export function registerAuth(app,db,{secure,appOrigin,inviteKey,allowSignup,enab
     const value=cookieValue(request,name);
     if(!value)fail(401,'Sign in to continue.');
     const context=await first(client,
-      'SELECT w.id workspace_id,w.name workspace_name,w.slug,w.currency,w.timezone,w.is_demo,w.expires_at, '+
+      'SELECT w.id workspace_id,w.name workspace_name,w.slug,w.currency,w.timezone,w.is_demo,w.expires_at,w.receipt_address,w.receipt_phone, '+
       'm.id member_id,m.name member_name,m.email,m.role FROM sessions s '+
       'JOIN members m ON m.workspace_id=s.workspace_id AND m.id=s.member_id JOIN workspaces w ON w.id=s.workspace_id '+
       "WHERE s.token_hash=$1 AND s.expires_at>now() AND m.status='active' AND (w.expires_at IS NULL OR w.expires_at>now())",[hash(value)]);
@@ -117,7 +117,7 @@ export function registerAuth(app,db,{secure,appOrigin,inviteKey,allowSignup,enab
     const existing=await access(request).catch(error=>{if(error.statusCode!==401)throw error;return null;});
     if(existing)fail(409,'Sign out of the current workspace before opening a demo.');
     const session=await transaction(db,async client=>{
-      const workspace=await createWorkspace(client,{business:'Harbourline Trading',name:'Demo Administrator',
+      const workspace=await createWorkspace(client,{business:'Harbourline Beauty Supply',name:'Demo Administrator',
         email:'administrator@example.test',currency:'GHS',timezone:'Africa/Accra'},true);
       await seedDemo(client,workspace);
       return openSession(client,workspace.workspace_id,workspace.member_id);

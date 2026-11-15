@@ -9,10 +9,12 @@ Use Node.js 22 or 24 and a dedicated PostgreSQL database. Run `npm install`, `np
 ## Business onboarding
 
 1. Create a business workspace. Save its code and your one-time recovery code in a password manager.
-2. Add products with their SKU, location, reorder point and default unit prices.
-3. Receive opening stock or imports under **Inbound stock**. Receipts update availability immediately.
+2. Add products with their SKU, location, reorder point and default unit prices. Set units per box and, if applicable, boxes per carton. When reviewing stock, the system converts the total units to full cartons, full boxes and loose units.
+3. Receive opening stock or imports under **Inbound stock**. Enter units, boxes and cartons in any combination. A receipt uses the unit cost and updates availability immediately.
 4. Use **Users & access** to create a one-time invitation for each employee. Send each link privately. Role changes and deactivation revoke existing sessions.
-5. Open a sale to record collections, clear or reject a cheque, or print the document. Use CSV exports to reconcile the inventory, sales and expense registers. Reversals require a reason and leave the original document in the history.
+5. Open a sale to record collections, clear or reject a cheque, or print its receipt. Each cleared payment has its own receipt. Goods received receipts and sales records also offer **Print / Save PDF**. Configure the business address and phone under **Settings**.
+6. Use **Reports** for stock, sales, collections, received shipments, credit aging, cheques and expenses. Exports follow the current report filters.
+7. Open **End of day**, select the business date, and record the opening and counted cash to save a reconciliation with the report values at that time. The cash estimate uses cleared cash payments and recorded cash expenses. Reversals require a reason and leave the original document in the history.
 
 The demo uses fictional data in a private, expiring workspace. Opening a demo while signed in to a business requires signing out first. The application records payments collected elsewhere. It does not charge cards, move Mobile Money, deposit cheques, issue tax invoices or replace a general ledger. Catalogue cost supports an indicative stock value, not FIFO accounting.
 

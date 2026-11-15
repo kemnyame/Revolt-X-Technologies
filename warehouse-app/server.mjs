@@ -10,6 +10,7 @@ import { seedDemo } from './demo.mjs';
 const assets = {
   '/': ['./public/index.html','text/html; charset=utf-8'],
   '/app.js': ['./public/app.js','text/javascript; charset=utf-8'],
+  '/reports-ui.js': ['./public/reports-ui.js','text/javascript; charset=utf-8'],
   '/styles.css': ['./public/styles.css','text/css; charset=utf-8'],
   '/mark.svg': ['./public/mark.svg','image/svg+xml']
 };
@@ -50,6 +51,7 @@ export async function appFor(db, options){
     app.get(path,async(_request,reply)=>reply.type(contentType).send(contents));
   }
   app.get('/health',async(_request,reply)=>{
+    if(process.env.RENDER_GIT_COMMIT)reply.header('x-warehouse-release',process.env.RENDER_GIT_COMMIT);
     try{await db.query('SELECT 1');return {status:'ready'};}
     catch{return reply.code(503).send({status:'unavailable'});}
   });

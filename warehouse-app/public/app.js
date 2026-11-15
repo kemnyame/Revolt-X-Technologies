@@ -1,3 +1,5 @@
+import { createReports } from './reports-ui.js';
+
 const root = document.querySelector('#app');
 const dialog = document.querySelector('#dialog');
 const toastArea = document.querySelector('#toasts');
@@ -14,6 +16,9 @@ const nav=[
   ['dashboard','Overview','grid'],['inventory','Available stock','boxes'],
   ['inbound','Inbound stock','in',['admin','warehouse']],['sales','Sales','receipt',['admin','sales','finance']],
   ['expenses','Expenses','wallet',['admin','finance']],['movements','Stock movements','arrows',['admin','warehouse','finance']]
+ ]],
+ ['Reporting',[
+  ['reports','Reports','report'],['end-of-day','End of day','clock',['admin','finance']]
  ]],
  ['Administration',[
   ['users','Users & access','users',['admin']],['audit','Audit log','shield',['admin']],['settings','Settings','settings',['admin']]
@@ -36,7 +41,8 @@ const paths={
  bell:'M18 8a6 6 0 0 0-12 0c0 7-2 7-2 9h16c0-2-2-2-2-9M10 21h4',
  trend:'m3 17 6-6 4 4 7-9m-6 0h6v6', out:'M12 20V5m-5 5 5-5 5 5M4 16v4h16v-4',
  check:'m4 12 5 5L20 6', clock:'M12 7v5l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z',
- alert:'M12 3 2 20h20L12 3zm0 7v4m0 3h.01'
+ alert:'M12 3 2 20h20L12 3zm0 7v4m0 3h.01',
+ report:'M5 3h14v18H5z M8 16v-4m4 4V8m4 8v-6'
 };
 const icon = key => '<svg aria-hidden="true" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="'+paths[key]+'"/></svg>';
 const esc = value => String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -63,6 +69,28 @@ const dateField = (name='date',value=today(),limited=true) => input(name,value,'
 const amountField = (name,value='') => input(name,value,'type="number" min="0" step="0.01" max="100000000" required inputmode="decimal"');
 const cents = value => Math.round(Number(value)*100);
 const toMajor = minor => (Number(minor||0)/100).toFixed(2);
+function packBreakdown(value, product) {
+  const unitsPerBox=Number(product.units_per_box||0);
+  if(!unitsPerBox)return '';
+  const boxesPerCarton=Number(product.boxes_per_carton||0);
+  const allBoxes=Math.floor(value/unitsPerBox);
+  const cartons=boxesPerCarton?Math.floor(allBoxes/boxesPerCarton):0;
+  const boxes=boxesPerCarton?allBoxes%boxesPerCarton:allBoxes;
+  const loose=value%unitsPerBox;
+  return [
+    cartons?count(cartons)+(cartons===1?' carton':' cartons'):'',
+    boxes?count(boxes)+(boxes===1?' box':' boxes'):'',
+    loose?count(loose)+' loose':''
+  ].filter(Boolean).join(' + ');
+}
+function packLabel(p) {
+  return p.units_per_box ? count(p.units_per_box)+' / box'+
+    (p.boxes_per_carton?' · '+count(p.boxes_per_carton)+' boxes / carton':'') : 'Each only';
+}
+function quantityCell(value,product) {
+  const breakdown=packBreakdown(Number(value),product);
+  return '<strong>'+count(value)+' '+esc(product.unit)+'</strong>'+(breakdown?'<small>'+esc(breakdown)+'</small>':'');
+}
 const roleName = () => roles[state.user?.role]||'';
 const paymentTone = status => ({paid:'good',settled:'good',pending:'warn','cheque pending':'warn','part paid':'blue',outstanding:'warn',overdue:'bad',reversed:'bad',rejected:'bad'}[String(status).toLowerCase()]||'');
 const title = key => nav.flatMap(([,entries])=>entries).find(([name])=>name===key)?.[1]||'Overview';
@@ -150,7 +178,7 @@ function renderAuth(){
     '<div class="auth-switch">'+(state.auth==='login'?
       (settings.allowSignup?'<button class="link-button" data-auth="signup">Create a workspace</button>':'')+'<button class="link-button" data-auth="recover">Forgot your password?</button>':
       '<button class="link-button" data-auth="login">Back to sign in</button>')+'</div>'+
-    (settings.enableDemo&&state.auth==='login'?'<div class="auth-demo"><span><strong>Explore with sample data</strong><p>Fictional stock, customers and users</p></span>'+button('Open demo','','boxes','id="demo-start"')+'</div>':'')+
+    (settings.enableDemo&&state.auth==='login'?'<div class="auth-demo"><span><strong>Explore a cosmetics warehouse</strong><p>Sample cosmetics, sales and payments</p></span>'+button('Open demo','','boxes','id="demo-start"')+'</div>':'')+
     '</section></main></div>';
   root.querySelectorAll('[data-auth]').forEach(item=>item.onclick=()=>{
     state.auth=item.dataset.auth;state.authNote='';renderAuth();
@@ -263,6 +291,7 @@ async function openWorkspace(existing){
   state.user=existing||await request('/api/session',{quiet:true});
   state.page='dashboard';
   state.lists={};
+  reporting.reset();
   renderShell();
   await go('dashboard');
 }
@@ -289,6 +318,11 @@ async function go(page,filter){
       state.dashboard=result;
       renderDashboard(result);
     } else if(page==='settings')renderSettings();
+    else if(page==='reports'||page==='end-of-day'){
+      const result=await reporting.load(page);
+      if(seq!==state.seq)return;
+      reporting.render(page,result);
+    }
     else{
       const query=state.lists[page]??={q:'',filter:page==='inventory'?'active':'',page:1};
       const result=await request('/api/'+page+'?'+new URLSearchParams(query));
@@ -351,7 +385,8 @@ function renderDashboard(report){
       metric('Active products',count(stock.skus),'Inventory catalogue','boxes','blue')+
       metric('Stock valuation',stock.stock_value===undefined?'—':money(stock.stock_value),'Using catalogue costs','wallet','slate'))+
     metric('Low-stock items',count(stock.low),'At or below reorder level','alert','amber');
-  const shortcuts=(can('admin','warehouse')?button('Receive stock','','in','data-action="new-inbound"'):'')+(can('admin','sales')?primary('New sale','new-sales'):'');
+  const shortcuts=(financialView()?button('End of day','','clock','data-go="end-of-day"'):'')+
+    (can('admin','warehouse')?button('Receive stock','','in','data-action="new-inbound"'):'')+(can('admin','sales')?primary('New sale','new-sales'):'');
   const activity=report.activity.length?'<div class="activity-list">'+report.activity.map(row=>
     '<div class="activity-row"><div class="activity-product"><div class="activity-icon '+(row.delta<0?'out':'')+'">'+icon(row.delta<0?'out':'in')+
     '</div><div><strong>'+esc(row.name)+'</strong><small>'+esc(actions[row.kind])+' · '+esc(row.reference)+'</small></div></div>'+
@@ -394,7 +429,8 @@ const productStatus = row => row.archived?mark('Archived'):!row.quantity?mark('O
 function columns(page){
   if(page==='inventory')return [
     ['Product',r=>'<strong>'+esc(r.name)+'</strong><small>'+esc(r.sku)+'</small>'],
-    ['Category',r=>esc(r.category)],['Location',r=>esc(r.location)],['Available',r=>count(r.quantity)+' '+esc(r.unit),'num'],
+    ['Category',r=>esc(r.category)],['Location',r=>esc(r.location)],['Available',r=>quantityCell(r.quantity,r),'num'],
+    ['Pack size',r=>esc(packLabel(r))],
     ['Reorder level',r=>count(r.reorder_point),'num'],['Sale price',r=>esc(money(r.price_minor)),'num'],
     ['Status',productStatus],...(stockEdit()?[['Actions',r=>rowButton('Edit','edit-product',r.id)+
       (can('admin')&&!r.archived?' '+rowButton('Adjust','adjust-product',r.id):'')]]:[])
@@ -481,13 +517,15 @@ function renderSettings(){
     field('Workspace name',input('name',u.workspace_name,'required maxlength="120"'),true)+
     field('Workspace code',input('code',u.slug,'readonly'),true)+
     field('Currency',select('currency',currencyChoices,u.currency))+field('Time zone',select('timezone',timezoneChoices,u.timezone))+
+    field('Address on receipts',input('receiptAddress',u.receipt_address,'maxlength="250"'),true)+
+    field('Phone on receipts',input('receiptPhone',u.receipt_phone,'maxlength="48"'))+
     '</div><div class="form-footer"><button type="submit" class="btn primary">Save settings</button></div></form></div></section>'+
     '<section class="panel">'+panelHead('Access by role','Permissions apply within this workspace.')+
     '<div class="panel-body role-guide">'+[
       ['Administrator','Manage stock, sales, finance, users and the audit log.'],
       ['Warehouse operator','Manage products, receive shipments and view stock movements.'],
       ['Sales clerk','View available stock and post sales.'],
-      ['Finance officer','Review sales, record payments and expenses, and reconcile cheques.'],
+      ['Finance officer','Review sales, record payments and expenses, clear cheques and reconcile daily cash.'],
       ['Viewer','See available stock and low-stock alerts.']
     ].map(([name,description])=>'<div><strong>'+name+'</strong><small>'+description+'</small></div>').join('')+'</div></section></div>';
   const write=writer('/api/workspace','PUT');
@@ -505,17 +543,21 @@ function productForm(row){
   const edit=Boolean(row);
   const write=writer('/api/inventory'+(edit?'/'+row.id:''),edit?'PUT':'POST');
   const controls=field('Product name',input('name',row?.name,'required maxlength="120"'),true)+
-    field('SKU',input('sku',row?.sku,'required maxlength="48" placeholder="e.g. EL-1005"'))+
+    field('SKU',input('sku',row?.sku,'required maxlength="48" placeholder="e.g. FR-1001"'))+
     field('Category',input('category',row?.category,'required maxlength="80"'))+
-    field('Unit',input('unit',row?.unit||'pcs','required maxlength="24"'))+
+    field('Base unit',input('unit',row?.unit||'pcs','required maxlength="24"'))+
     field('Bin or location',input('location',row?.location,'required maxlength="60" placeholder="e.g. A-05"'))+
-    field('Reorder point',input('reorderPoint',row?.reorder_point??0,'type="number" min="0" max="1000000000" step="1" required'))+
+    field('Units per box',input('unitsPerBox',row?.units_per_box,'type="number" min="2" max="1000" placeholder="Optional"'))+
+    field('Boxes per carton',input('boxesPerCarton',row?.boxes_per_carton,'type="number" min="2" max="1000" placeholder="Optional"'))+
+    field('Reorder point in units',input('reorderPoint',row?.reorder_point??0,'type="number" min="0" max="1000000000" step="1" required'),true)+
     field('Catalogue unit cost',amountField('cost',row?toMajor(row.cost_minor):''))+
     field('Default sale price',amountField('price',row?toMajor(row.price_minor):''))+
     (edit?field('Product status',select('status',[['active','Active'],['archived','Archived']],row.archived?'archived':'active')):'');
   formDialog(edit?'Edit product':'Add product',edit?'Update the catalogue information. Use a stock adjustment to change the quantity.':'Receive a shipment to add quantity after creating the product.',controls,edit?'Save product':'Add product',async values=>{
-    const {name,sku,category,unit,location}=values;
-    await write({name,sku,category,unit,location,reorderPoint:Number(values.reorderPoint),costMinor:cents(values.cost),priceMinor:cents(values.price),...(edit?{archived:values.status==='archived'}:{})});
+    const {name,sku,category,unit,location,unitsPerBox,boxesPerCarton}=values;
+    await write({name,sku,category,unit,location,reorderPoint:Number(values.reorderPoint),costMinor:cents(values.cost),priceMinor:cents(values.price),
+      unitsPerBox:unitsPerBox?Number(unitsPerBox):null,boxesPerCarton:boxesPerCarton?Number(boxesPerCarton):null,
+      ...(edit?{archived:values.status==='archived'}:{})});
     await saved(edit?'Product updated.':'Product added.','inventory');
   });
 }
@@ -542,18 +584,25 @@ async function stockDocument(isSale){
   const controls=people+when+extra+field('Notes',note('notes','','maxlength="500"'),true);
   const lineArea='<div class="line-wrap"><div class="line-head"><h3>Items</h3>'+button('Add line','small','plus','id="add-line"')+'</div>'+
     '<div id="line-search"></div><div class="line-headers"><span>Product</span><span>Quantity</span><span>'+
-    (isSale?'Unit price':'Unit cost')+'</span><span>Subtotal</span><span></span></div><div id="line-items"></div>'+
+    (isSale?'Price per unit':'Cost per unit')+'</span><span>Line total</span><span></span></div><div id="line-items"></div>'+
     '<div id="document-total" class="doc-total"></div></div>';
   const form=formDialog(isSale?'New sale':'Receive inbound stock',isSale?'Posting a sale reduces available stock immediately.':'Posting a receipt adds its quantities to available stock.',
     controls,isSale?'Post sale':'Post receipt',async values=>{
-    const lines=Array.from(el('line-items').querySelectorAll('.line')).map(line=>({
-      productId:line.querySelector('select').value,quantity:Number(line.querySelector('[name=lineQuantity]').value),
-      [isSale?'priceMinor':'costMinor']:cents(line.querySelector('[name=lineAmount]').value)
-    }));
+    const lines=Array.from(el('line-items').querySelectorAll('.line')).map(line=>{
+      const product=selectedProduct(line);
+      return {
+        productId:product.id,quantity:lineNumber(line,'lineQuantity'),
+        boxes:lineNumber(line,'lineBoxes'),cartons:lineNumber(line,'lineCartons'),
+        pack:{unitsPerBox:product.units_per_box,boxesPerCarton:product.boxes_per_carton},
+        [isSale?'priceMinor':'costMinor']:cents(line.querySelector('[name=lineAmount]').value)
+      };
+    });
     const payload=isSale?{customer:values.customer,date:values.date,method:values.method,dueOn:values.method==='credit'?values.dueOn:null,reference:values.reference,notes:values.notes,lines}:
       {supplier:values.supplier,date:values.date,shipment:values.shipment,notes:values.notes,lines};
     const result=await write(payload);
-    await saved((isSale?'Sale posted':'Stock received')+' · '+result.reference,isSale?'sales':'inbound');
+    const page=isSale?'sales':'inbound';
+    await saved((isSale?'Sale posted':'Stock received')+' · '+result.reference,page);
+    await showDocument(page,result.id).catch(error=>toast(error.message,true));
   },{wide:true,documentBody:lineArea});
   let products=initial;
   const lineItems=el('line-items');
@@ -566,11 +615,30 @@ async function stockDocument(isSale){
     const options=[['','Select product'],...products.map(p=>[p.id,p.sku+' · '+p.name+' ('+p.quantity+' '+p.unit+' available)'])];
     return select('product',options,selected||'','required aria-label="Product"');
   }
+  function selectedProduct(line){
+    return products.find(p=>p.id===line.querySelector('[name=product]').value);
+  }
+  function lineNumber(line,name){
+    const input=line.querySelector('[name='+name+']');
+    return input.disabled?0:Number(input.value);
+  }
+  function packControls(line,p){
+    for(const [selector,configured] of [['lineBoxes',p?.units_per_box],['lineCartons',p?.boxes_per_carton]]){
+      const control=line.querySelector('[name='+selector+']');
+      control.disabled=!configured;
+      control.closest('label').hidden=!configured;
+    }
+    line.querySelector('.line-pack-note').textContent=p?packLabel(p):'';
+  }
   function calculate(){
     let total=0;
     for(const line of lineItems.querySelectorAll('.line')){
-      const sub=Number(line.querySelector('[name=lineQuantity]').value)*cents(line.querySelector('[name=lineAmount]').value);
-      line.querySelector('output').textContent=money(sub);total+=sub;
+      const p=selectedProduct(line);
+      const perBox=p?.units_per_box||0, perCarton=perBox*(p?.boxes_per_carton||0);
+      const quantity=lineNumber(line,'lineQuantity')+lineNumber(line,'lineBoxes')*perBox+lineNumber(line,'lineCartons')*perCarton;
+      const sub=quantity*cents(line.querySelector('[name=lineAmount]').value);
+      line.querySelector('output').innerHTML='<strong>'+esc(money(sub))+'</strong><small>'+count(quantity)+' units</small>';
+      total+=sub;
     }
     el('document-total').textContent='Total '+money(total);
   }
@@ -578,14 +646,20 @@ async function stockDocument(isSale){
     if(lineItems.children.length>=40){toast('A document can contain up to 40 items.',true);return;}
     const line=document.createElement('div');
     line.className='line';
-    line.innerHTML=productOptions()+
-      input('lineQuantity',1,'aria-label="Quantity" type="number" min="1" max="1000000" step="1" required')+
+    const whole='type="number" min="0" max="1000000" step="1"';
+    line.innerHTML='<div class="line-product">'+productOptions()+'<small class="line-pack-note"></small></div>'+
+      '<div class="line-quantity">'+field('Units',input('lineQuantity',0,whole+' aria-label="Units"'))+
+      field('Boxes',input('lineBoxes',0,whole))+field('Cartons',input('lineCartons',0,whole))+'</div>'+
       amountField('lineAmount')+'<output></output>'+button('×','small','','title="Remove line" aria-label="Remove line" data-remove-line');
     line.querySelector('[name=lineAmount]').setAttribute('aria-label',isSale?'Unit price':'Unit cost');
+    packControls(line,null);
     line.addEventListener('change',event=>{
       if(event.target.name==='product'){
-        const p=products.find(item=>item.id===event.target.value);
+        const p=selectedProduct(line);
         line.querySelector('[name=lineAmount]').value=p?toMajor(isSale?p.price_minor:p.cost_minor):'';
+        line.querySelector('[name=lineBoxes]').value=0;
+        line.querySelector('[name=lineCartons]').value=0;
+        packControls(line,p);
       }
       calculate();
     });
@@ -608,6 +682,8 @@ async function stockDocument(isSale){
         const wrapper=document.createElement('div');wrapper.innerHTML=productOptions(chosen[i]);
         control.replaceWith(wrapper.firstElementChild);
       });
+      for(const line of lineItems.querySelectorAll('.line'))packControls(line,selectedProduct(line));
+      calculate();
       if(!matches.length)toast('No active products match that search.',true);
     }catch(error){toast(error.message,true);}
   };
@@ -658,14 +734,25 @@ function userForm(row){
 function receiptControls(label,value){
   return '<div class="detail-cell"><span>'+esc(label)+'</span><strong>'+esc(value??'—')+'</strong></div>';
 }
+function receiptContact(){
+  const {receipt_address,receipt_phone}=state.user;
+  const contact=[receipt_address,receipt_phone].filter(Boolean);
+  return contact.length?'<p class="receipt-contact">'+contact.map(esc).join(' · ')+'</p>':'';
+}
 function printDocument(){
   document.body.classList.add('printing');
   try{window.print();}finally{document.body.classList.remove('printing');}
 }
-async function showDocument(page,id){
+async function showDocument(page,id,paymentId){
   const doc=await request('/api/'+page+'/'+id);
+  if(paymentId){
+    const payment=doc.payments?.find(row=>row.id===paymentId);
+    if(!payment)throw Error('Payment could not be found.');
+    return showPaymentReceipt(doc,payment);
+  }
   const isSale=page==='sales', inbound=page==='inbound';
   const heading=isSale?'Sale':inbound?'Inbound receipt':'Expense';
+  const receiptHeading=isSale?(doc.status==='Paid'?'Sales receipt':'Sale record'):inbound?'Goods received receipt':'Expense record';
   const details=isSale?[
     ['Customer',doc.customer],['Sale date',date(doc.sold_on)],['Payment method',methods[doc.method]],['Total',money(doc.total_minor)],
     ['Amount paid',money(doc.paid_minor)],['Amount owing',money(doc.balance_minor)],['Pending cheques',money(doc.pending_minor)],
@@ -677,33 +764,53 @@ async function showDocument(page,id){
     ['Amount',money(doc.amount_minor)],['Status',doc.voided_at?'Reversed':'Posted']
   ];
   const documentLines=doc.lines?'<section class="detail-section"><h3>Items</h3>'+table([
-    ['SKU',r=>esc(r.sku)],['Product',r=>esc(r.name)],['Quantity',r=>count(r.quantity)+' '+esc(r.unit),'num'],
+    ['SKU',r=>esc(r.sku)],['Product',r=>esc(r.name)],['Quantity',r=>quantityCell(r.quantity,r),'num'],
     [isSale?'Unit price':'Unit cost',r=>esc(money(isSale?r.price_minor:r.cost_minor)),'num'],
     ['Subtotal',r=>esc(money(r.quantity*Number(isSale?r.price_minor:r.cost_minor))),'num']
   ],doc.lines)+'</section>':'';
   const paymentRows=isSale?'<section class="detail-section"><h3>Payment history</h3>'+table([
     ['Received',r=>esc(date(r.received_on))],['Method',r=>esc(methods[r.method])],['Reference',r=>esc(r.reference||'—')],
     ['Amount',r=>esc(money(r.amount_minor)),'num'],['Status',r=>mark(r.status,paymentTone(r.status))],
-    ...(financialView()&&!doc.voided_at?[['Actions',r=>r.status==='pending'?rowButton('Clear cheque','clear-cheque',r.id)+' '+rowButton('Reject cheque','reject-cheque',r.id):'']]:[])
+    ['Receipt',r=>r.status==='settled'?'<span class="no-print">'+rowButton('Payment receipt','payment-receipt',r.id)+
+      '</span><span class="print-only">'+esc(r.receipt_number)+'</span>':
+      (financialView()&&!doc.voided_at&&r.status==='pending'?'<span class="no-print">'+rowButton('Clear cheque','clear-cheque',r.id)+' '+
+        rowButton('Reject cheque','reject-cheque',r.id)+'</span>':'—')]
   ],doc.payments)+'</section>':'';
   const remaining=Number(doc.balance_minor||0)-Number(doc.pending_minor||0);
   const reverseAllowed=!doc.voided_at&&(isSale||inbound?can('admin'):financialView());
-  openDialog(heading+' '+doc.reference,state.user.workspace_name,
-    '<div class="detail-grid">'+details.map(pair=>receiptControls(...pair)).join('')+'</div>'+
+  openDialog(receiptHeading+' '+doc.reference,state.user.workspace_name,
+    receiptContact()+'<div class="detail-grid">'+details.map(pair=>receiptControls(...pair)).join('')+'</div>'+
     (doc.void_reason?'<div class="notice warn">Reversal reason: '+esc(doc.void_reason)+'</div>':'')+
     ((doc.notes||doc.description)?'<p class="muted">'+esc(doc.notes||doc.description)+'</p>':'')+documentLines+paymentRows+
     '<div class="form-footer no-print">'+
     (reverseAllowed?button('Reverse '+heading.toLowerCase(),'danger','','data-reverse'):'')+
-    button('Print / Save PDF','','','data-print')+
-    (isSale&&financialView()&&remaining>0&&!doc.voided_at?button('Record payment','primary','','data-add-payment'):'')+
+    (isSale&&financialView()&&remaining>0&&!doc.voided_at?button('Record payment','','','data-add-payment'):'')+
+    button('Print / Save PDF','primary','','data-print')+
     '</div>',true);
   dialog.querySelector('[data-print]').onclick=printDocument;
   if(reverseAllowed)dialog.querySelector('[data-reverse]').onclick=()=>reverseDocument(page,doc);
   dialog.querySelector('[data-add-payment]')?.addEventListener('click',()=>paymentForm(doc,remaining));
+  dialog.querySelectorAll('[data-action=payment-receipt]').forEach(trigger=>trigger.onclick=()=>{
+    showPaymentReceipt(doc,doc.payments.find(row=>row.id===trigger.dataset.id));
+  });
   dialog.querySelectorAll('[data-action$="-cheque"]').forEach(trigger=>trigger.onclick=()=>{
     const payment=doc.payments.find(r=>r.id===trigger.dataset.id);
     chequeForm(doc,payment,trigger.dataset.action==='clear-cheque');
   });
+}
+function showPaymentReceipt(sale,payment){
+  if(!payment.settled_on||!['settled','reversed'].includes(payment.status))throw Error('Payment has not cleared.');
+  const details=[
+    ['Customer',sale.customer],['Sale reference',sale.reference],['Payment date',date(payment.settled_on)],
+    ['Payment method',methods[payment.method]],['Payment reference',payment.reference],['Amount',money(payment.amount_minor)],
+    ['Status',payment.status==='reversed'?'Reversed':'Paid']
+  ];
+  openDialog('Payment receipt '+payment.receipt_number,state.user.workspace_name,
+    receiptContact()+'<div class="detail-grid">'+details.map(pair=>receiptControls(...pair)).join('')+'</div>'+
+    '<div class="form-footer no-print">'+button('Back to sale','','','data-return-sale')+
+    button('Print / Save PDF','primary','','data-print')+'</div>',true);
+  dialog.querySelector('[data-return-sale]').onclick=()=>{void showDocument('sales',sale.id).catch(e=>toast(e.message,true));};
+  dialog.querySelector('[data-print]').onclick=printDocument;
 }
 function reverseDocument(page,doc){
   const write=writer('/api/'+page+'/'+doc.id+'/reverse');
@@ -735,6 +842,21 @@ function chequeForm(sale,payment,clear){
       toast(clear?'Cheque cleared.':'Cheque rejected.');void go('sales');await showDocument('sales',sale.id);
     });
 }
+async function downloadCsv(url,filename){
+  const response=await fetch(url,{credentials:'same-origin',cache:'no-store'});
+  if(!response.ok){
+    const error=await response.json().catch(()=>null);
+    throw Error(error?.error||'Export could not be downloaded.');
+  }
+  const objectUrl=URL.createObjectURL(await response.blob());
+  const link=document.createElement('a');
+  link.href=objectUrl;
+  link.download=filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(()=>URL.revokeObjectURL(objectUrl),1000);
+}
 async function perform(trigger){
   const name=trigger.dataset.action,id=trigger.dataset.id;
   const row=state.visibleRows?.find(item=>item.id===id);
@@ -753,14 +875,7 @@ async function perform(trigger){
   }
   if(name==='export'){
     const {q,filter}=state.lists[state.page];
-    const url='/api/'+state.page+'/export?'+new URLSearchParams({q,filter});
-    const response=await fetch(url,{credentials:'same-origin',cache:'no-store'});
-    if(!response.ok){const error=await response.json().catch(()=>null);throw Error(error?.error||'Export could not be downloaded.');}
-    const objectUrl=URL.createObjectURL(await response.blob());
-    const link=document.createElement('a');link.href=objectUrl;link.download='warehouse-'+state.page+'.csv';
-    document.body.append(link);link.click();link.remove();
-    setTimeout(()=>URL.revokeObjectURL(objectUrl),1000);
-    return;
+    return downloadCsv('/api/'+state.page+'/export?'+new URLSearchParams({q,filter}),'warehouse-'+state.page+'.csv');
   }
   if(name.startsWith('view-'))return showDocument(name.slice(5),id);
 }
@@ -787,4 +902,10 @@ async function boot(){
     el('boot-retry').onclick=boot;
   }
 }
+const reporting=createReports({
+  request,go,el,esc,money,count,date,methods,actions,pageHeader,button,primary,panelHead,table,empty,metric,field,
+  input,select,dateField,amountField,note,detailCell:receiptControls,cents,mark,paymentTone,openDialog,formDialog,
+  printDocument,writer,toast,viewDocument:showDocument,viewPayment:(sale,payment)=>showDocument('sales',sale,payment),
+  downloadCsv,user:()=>state.user
+});
 void boot();
